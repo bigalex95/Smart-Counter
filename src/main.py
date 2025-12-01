@@ -1,5 +1,11 @@
+import time
 import cv2
 from ultralytics import YOLO  # type: ignore
+from utils.fps_utils import (
+    measure_fps_from_seconds,
+    measure_fps_from_milliseconds,
+    ms_sum,
+)
 
 # 1. Load the model
 model = YOLO("models/yolov8s.pt")
@@ -22,8 +28,16 @@ line_tolerance = 20  # Zone around the line for detection
 # Create set to store counted IDs
 counted_ids = set()
 
+# Lists to store timings
+model_times_ms = []  # per-frame model time (ms) from results[0].speed
+system_times_s = []  # per-frame full-loop time (seconds)
+frame_count = 0
+
 # 3. Start infinite loop
 while True:
+
+    loop_start = time.time()
+
     # Read frame
     ret, frame = cap.read()
 
@@ -33,6 +47,20 @@ while True:
 
     # Run frame through model.track with persist=True
     results = model.track(frame, persist=True)
+
+    # Try to extract per-stage times from results (ms) and accumulate
+    speed = getattr(results[0], "speed", None)
+    if speed is not None:
+        total_model_ms = ms_sum(speed)
+        model_times_ms.append(total_model_ms)
+        print(
+            f"Speed => pre: {speed.get('preprocess', 0.0):.2f}ms | "
+            f"inf: {speed.get('inference', 0.0):.2f}ms | "
+            f"post: {speed.get('postprocess', 0.0):.2f}ms | "
+            f"total: {total_model_ms:.2f}ms"
+        )
+    else:
+        print("Speed info not available in results[0].speed")
 
     # Get annotated frame
     annotated_frame = results[0].plot()
@@ -100,8 +128,36 @@ while True:
 
     # Wait for 'q' key press to exit
     if cv2.waitKey(1) & 0xFF == ord("q"):
+        loop_end = time.time()
+        system_times_s.append(loop_end - loop_start)
         break
+
+    # End of loop timing
+    loop_end = time.time()
+    system_times_s.append(loop_end - loop_start)
+    frame_count += 1
+
+    # Periodic running averages
+    if frame_count > 0 and frame_count % 60 == 0:
+        running_model_fps = (
+            measure_fps_from_milliseconds(model_times_ms) if model_times_ms else 0.0
+        )
+        running_system_fps = (
+            measure_fps_from_seconds(system_times_s) if system_times_s else 0.0
+        )
+        print(
+            f"Running (last {frame_count} frames) — model FPS: {running_model_fps:.2f}, system FPS: {running_system_fps:.2f}"
+        )
 
 # Release resources
 cap.release()
 cv2.destroyAllWindows()
+
+# Compute and print averages
+total_frames = max(1, frame_count)
+avg_model_fps = measure_fps_from_milliseconds(model_times_ms) if model_times_ms else 0.0
+avg_system_fps = measure_fps_from_seconds(system_times_s) if system_times_s else 0.0
+print("--- Summary ---")
+print(f"Frames processed: {frame_count}")
+print(f"Average model FPS (from results[0].speed): {avg_model_fps:.2f}")
+print(f"Average system FPS (full loop): {avg_system_fps:.2f}")
