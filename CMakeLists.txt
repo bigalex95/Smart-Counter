@@ -21,7 +21,7 @@ set(CMAKE_INSTALL_RPATH "${ORT_ROOT}/lib")
 set(CMAKE_BUILD_RPATH "${ORT_ROOT}/lib")
 
 # 4. Собираем исполняемый файл
-add_executable(SmartCounter src/main.cpp src/detector.cpp)
+add_executable(SmartCounter src/main.cpp src/detector.cpp src/tracker.cpp)
 
 # 5. Подключаем заголовки
 target_include_directories(SmartCounter PUBLIC
