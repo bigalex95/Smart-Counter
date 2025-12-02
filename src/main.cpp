@@ -2,6 +2,7 @@
 #include <opencv2/opencv.hpp>
 #include "detector.h"
 #include "tracker.h"
+#include "fps_counter.h"
 #include <set>
 
 int main()
@@ -25,6 +26,9 @@ int main()
     
     std::set<int> counted_ids;
     int line_y = cap.get(cv::CAP_PROP_FRAME_HEIGHT) / 2; // Линия на середине кадра
+    
+    // FPS counter for tracking performance
+    FPSCounter fps_counter;
 
     cv::Mat frame;
     while (true)
@@ -82,17 +86,40 @@ int main()
 
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-        float fps = 1000.0f / (duration.count() + 1e-5); // +1e-5 чтобы не делить на 0
+        float frame_time_ms = static_cast<float>(duration.count());
+        
+        // Add sample to FPS counter
+        fps_counter.addSample(frame_time_ms);
+        
+        // Get FPS metrics
+        float avg_fps = fps_counter.getAverageFPS();
+        float instant_fps = fps_counter.getInstantFPS();
+        int frame_count = fps_counter.getFrameCount();
 
-        // Вывод FPS
-        cv::putText(frame, "FPS: " + std::to_string((int)fps), cv::Point(20, 40),
+        // Display FPS on frame (showing both average and instantaneous) - top-right corner
+        std::string fps_text = "FPS: " + std::to_string(static_cast<int>(instant_fps)) + 
+                               " (avg: " + std::to_string(static_cast<int>(avg_fps)) + ")";
+        int baseline = 0;
+        cv::Size text_size = cv::getTextSize(fps_text, cv::FONT_HERSHEY_SIMPLEX, 1, 2, &baseline);
+        cv::Point fps_position(frame.cols - text_size.width - 20, 40);  // 20px padding from right edge
+        cv::putText(frame, fps_text, fps_position,
                     cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 255), 2);
 
+        // Print periodic statistics every 60 frames
+        if (frame_count > 0 && frame_count % 60 == 0) {
+            std::cout << "Frame " << frame_count << " — Avg FPS: " << avg_fps 
+                      << ", Instant FPS: " << instant_fps << std::endl;
+        }
 
         cv::imshow("C++ YOLOv8 Inference", frame);
         if (cv::waitKey(1) == 'q')
             break;
     }
+
+    // Print final summary
+    std::cout << "\n--- Summary ---" << std::endl;
+    std::cout << "Frames processed: " << fps_counter.getFrameCount() << std::endl;
+    std::cout << "Average FPS: " << fps_counter.getAverageFPS() << std::endl;
 
     return 0;
 }
