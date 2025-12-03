@@ -20,41 +20,39 @@ CONTAINER_NAME="${CONTAINER_NAME:-smart-counter-runner}"
 
 # Functions
 show_usage() {
-    cat << EOF
-${GREEN}Smart-Counter MLOps Deployment${NC}
-
-Usage: $0 [command] [options]
-
-${YELLOW}Commands:${NC}
-  build       Build Docker image
-  run         Run container (one-time execution)
-  deploy      Deploy as persistent service
-  stop        Stop running container/service
-  logs        Show container logs
-  status      Check container status
-  shell       Open shell in running container
-  clean       Remove stopped containers and dangling images
-  
-${YELLOW}Options:${NC}
-  --gpu          Enable GPU support (default: auto-detect)
-  --cpu          Force CPU-only mode
-  --input PATH   Input video file or directory
-  --output PATH  Output video file path (default: data/output/output.mp4)
-  --model PATH   Path to ONNX model file (default: models/yolov8s.onnx)
-  --db PATH      Path to SQLite database (default: logs/analytics.db)
-  --display      Show display window (default: headless in Docker)
-  --dev          Mount source code for development
-  
-${YELLOW}Examples:${NC}
-  $0 build
-  $0 run --gpu --display
-  $0 run --input /path/to/video.mp4 --output result.mp4
-  $0 run --model models/yolov8n.onnx --cpu
-  $0 deploy --gpu
-  $0 logs
-  $0 stop
-  
-EOF
+    echo -e "${GREEN}Smart-Counter MLOps Deployment${NC}"
+    echo ""
+    echo "Usage: $0 [command] [options]"
+    echo ""
+    echo -e "${YELLOW}Commands:${NC}"
+    echo "  build       Build Docker image"
+    echo "  run         Run container (one-time execution)"
+    echo "  deploy      Deploy as persistent service"
+    echo "  stop        Stop running container/service"
+    echo "  logs        Show container logs"
+    echo "  status      Check container status"
+    echo "  shell       Open shell in running container"
+    echo "  clean       Remove stopped containers and dangling images"
+    echo ""
+    echo -e "${YELLOW}Options:${NC}"
+    echo "  --gpu          Enable GPU support (default: auto-detect)"
+    echo "  --cpu          Force CPU-only mode"
+    echo "  --input PATH   Input video file or directory"
+    echo "  --output PATH  Output video file path (default: data/output/output.mp4)"
+    echo "  --model PATH   Path to ONNX model file (default: models/yolov8s.onnx)"
+    echo "  --db PATH      Path to SQLite database (default: logs/analytics.db)"
+    echo "  --display      Show display window (default: headless in Docker)"
+    echo "  --dev          Mount source code for development"
+    echo ""
+    echo -e "${YELLOW}Examples:${NC}"
+    echo "  $0 build"
+    echo "  $0 run --gpu --display"
+    echo "  $0 run --input /path/to/video.mp4 --output result.mp4"
+    echo "  $0 run --model models/yolov8n.onnx --cpu"
+    echo "  $0 deploy --gpu"
+    echo "  $0 logs"
+    echo "  $0 stop"
+    echo ""
 }
 
 log_info() {
