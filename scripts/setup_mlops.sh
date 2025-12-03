@@ -78,6 +78,7 @@ install_dependencies() {
                 wget \
                 curl \
                 libopencv-dev \
+                libsqlite3-dev \
                 python3 \
                 python3-pip \
                 python3-venv
@@ -91,6 +92,7 @@ install_dependencies() {
                 wget \
                 curl \
                 opencv-devel \
+                sqlite-devel \
                 python3 \
                 python3-pip
             ;;
@@ -103,6 +105,7 @@ install_dependencies() {
                 wget \
                 curl \
                 opencv \
+                sqlite \
                 python \
                 python-pip
             ;;
@@ -110,6 +113,7 @@ install_dependencies() {
             echo -e "${RED}⚠️  Unknown distribution. Please install manually:${NC}"
             echo -e "  - CMake (>= 3.10)"
             echo -e "  - OpenCV"
+            echo -e "  - SQLite3 development libraries"
             echo -e "  - C++ compiler (g++/clang)"
             echo -e "  - Python 3"
             ;;
