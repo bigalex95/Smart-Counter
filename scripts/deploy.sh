@@ -41,6 +41,7 @@ ${YELLOW}Options:${NC}
   --input PATH   Input video file or directory
   --output PATH  Output video file path (default: data/output/output.mp4)
   --model PATH   Path to ONNX model file (default: models/yolov8s.onnx)
+  --db PATH      Path to SQLite database (default: logs/analytics.db)
   --display      Show display window (default: headless in Docker)
   --dev          Mount source code for development
   
@@ -103,6 +104,8 @@ run_container() {
     local output_path=""
     local model_mount=""
     local model_path=""
+    local db_mount="-v ${PROJECT_ROOT}/logs:/app/logs"
+    local db_path=""
     local dev_mount=""
     local run_mode="--headless"
     local cpu_flag=""
@@ -155,6 +158,13 @@ run_container() {
                 fi
                 shift 2
                 ;;
+            --db)
+                db_path="$2"
+                mkdir -p "$(dirname $(realpath $2))" 2>/dev/null || true
+                db_mount="-v $(realpath $(dirname $2)):/app/db_dir"
+                app_args="${app_args} --db /app/db_dir/$(basename $2)"
+                shift 2
+                ;;
             --dev)
                 dev_mount="-v ${PROJECT_ROOT}/src:/app/src -v ${PROJECT_ROOT}/include:/app/include"
                 shift
@@ -192,6 +202,9 @@ run_container() {
     if [ -n "$model_path" ]; then
         log_info "Model: $model_path"
     fi
+    if [ -n "$db_path" ]; then
+        log_info "Database: $db_path"
+    fi
     
     docker run --rm -it \
         --name "${CONTAINER_NAME}" \
@@ -200,6 +213,7 @@ run_container() {
         ${input_mount} \
         ${output_mount} \
         ${model_mount} \
+        ${db_mount} \
         ${dev_mount} \
         "${IMAGE_NAME}:${IMAGE_TAG}" \
         bash -c "/app/scripts/check_cuda.sh && ./build/SmartCounter ${run_mode} ${cpu_flag} ${app_args}"

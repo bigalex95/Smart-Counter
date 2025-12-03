@@ -28,6 +28,7 @@ Smart-Counter is a comprehensive people-counting system that goes beyond simple 
 ### 🎥 Real-Time Engine (Built for Performance)
 
 The system was prototyped in Python, then **rebuilt entirely in C++ with ONNX Runtime** for:
+
 - ✅ **Real-time speed** on edge devices
 - ✅ **Low latency** video processing
 - ✅ **Reliable deployment** with minimal dependencies
@@ -52,6 +53,7 @@ Beyond simple counting, Smart-Counter provides:
 - **Footfall analytics** – Track people entering/exiting zones
 - **Occupancy monitoring** – Real-time capacity tracking
 - **Time-based metrics** – Peak hours, dwell time analysis
+- **SQLite database** – Persistent storage with automatic logging (see [docs/DATABASE.md](docs/DATABASE.md))
 - **Heatmaps** – Visualize high-traffic areas
 - **Extensible hooks** – Add age/gender estimation or custom business rules
 
@@ -106,14 +108,14 @@ Designed with **MLOps principles** in mind:
 
 ## 🛠️ Technology Stack
 
-| Component | Technology |
-|-----------|-----------|
-| **Core Engine** | C++17 with ONNX Runtime |
-| **Prototype** | Python 3.9+ |
-| **Detection Model** | YOLOv8 (Ultralytics) |
-| **Tracking** | BoTSORT / ByteTrack |
-| **Computer Vision** | OpenCV 4.8+ |
-| **Build System** | CMake 3.10+ |
+| Component            | Technology              |
+| -------------------- | ----------------------- |
+| **Core Engine**      | C++17 with ONNX Runtime |
+| **Prototype**        | Python 3.9+             |
+| **Detection Model**  | YOLOv8 (Ultralytics)    |
+| **Tracking**         | BoTSORT / ByteTrack     |
+| **Computer Vision**  | OpenCV 4.8+             |
+| **Build System**     | CMake 3.10+             |
 | **GPU Acceleration** | CUDA + cuDNN (optional) |
 
 ---
@@ -144,6 +146,7 @@ cd Smart-Counter
 ```
 
 This script will:
+
 - Install system dependencies
 - Download ONNX Runtime (GPU or CPU version)
 - Set up Python virtual environment
@@ -210,6 +213,7 @@ python python/prototype.py
 ```
 
 Features:
+
 - YOLOv8 detection + tracking
 - Line crossing counter
 - Real-time FPS display
@@ -224,6 +228,7 @@ Optimized for deployment:
 ```
 
 Features:
+
 - High-performance ONNX inference
 - GPU acceleration support
 - Low memory footprint
@@ -237,13 +242,13 @@ Features:
 
 Choose the right YOLOv8 variant for your needs:
 
-| Model | Speed | Accuracy | Use Case |
-|-------|-------|----------|----------|
-| `yolov8n` | ⚡⚡⚡⚡⚡ | ⭐⭐⭐ | Edge devices, high FPS |
-| `yolov8s` | ⚡⚡⚡⚡ | ⭐⭐⭐⭐ | **Recommended** (balanced) |
-| `yolov8m` | ⚡⚡⚡ | ⭐⭐⭐⭐⭐ | More accuracy needed |
-| `yolov8l` | ⚡⚡ | ⭐⭐⭐⭐⭐⭐ | High accuracy priority |
-| `yolov8x` | ⚡ | ⭐⭐⭐⭐⭐⭐ | Maximum accuracy |
+| Model     | Speed      | Accuracy     | Use Case                   |
+| --------- | ---------- | ------------ | -------------------------- |
+| `yolov8n` | ⚡⚡⚡⚡⚡ | ⭐⭐⭐       | Edge devices, high FPS     |
+| `yolov8s` | ⚡⚡⚡⚡   | ⭐⭐⭐⭐     | **Recommended** (balanced) |
+| `yolov8m` | ⚡⚡⚡     | ⭐⭐⭐⭐⭐   | More accuracy needed       |
+| `yolov8l` | ⚡⚡       | ⭐⭐⭐⭐⭐⭐ | High accuracy priority     |
+| `yolov8x` | ⚡         | ⭐⭐⭐⭐⭐⭐ | Maximum accuracy           |
 
 ### Counting Line Setup
 
@@ -259,15 +264,17 @@ int line_tolerance = 20;         // Detection zone
 ## 📊 Performance
 
 ### Python Prototype
+
 - **Model FPS**: ~30-60 FPS (depending on hardware)
 - **System FPS**: ~25-45 FPS (full pipeline)
 
 ### C++ Engine
+
 - **Inference**: ~60-100+ FPS on GPU
 - **Full Pipeline**: ~50-80 FPS
 - **Latency**: < 20ms per frame
 
-*Benchmarks on NVIDIA GTX 1660 Ti with YOLOv8s*
+_Benchmarks on NVIDIA GeForce RTX 3060 Laptop GPU with YOLOv8s_
 
 ---
 
@@ -276,6 +283,7 @@ int line_tolerance = 20;         // Detection zone
 ### Edge Devices
 
 Smart-Counter can run on:
+
 - **NVIDIA Jetson** (Nano, Xavier, Orin)
 - **Raspberry Pi 4** (with optimization)
 - **Edge servers** (Intel NUC, etc.)
@@ -290,6 +298,7 @@ Smart-Counter can run on:
 ### API Integration
 
 The system is designed to be API-ready:
+
 - RESTful API for video streams
 - WebSocket for real-time updates
 - gRPC for high-performance communication

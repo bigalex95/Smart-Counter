@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     git \
     wget \
     libopencv-dev \
+    libsqlite3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # 4. Создаем рабочую директорию
@@ -31,13 +32,16 @@ COPY third_party/ ./third_party/
 # Копируем служебные скрипты (check_cuda, build/run helpers)
 COPY scripts/ ./scripts/
 
-# 6. Настраиваем сборку
+# 6. Создаем директорию для логов и базы данных
+RUN mkdir -p logs
+
+# 7. Настраиваем сборку
 RUN mkdir build && cd build && \
     cmake -DCMAKE_BUILD_TYPE=Release .. && \
     make -j$(nproc) && \
     chmod +x SmartCounter
 
-# 7. Указываем команду запуска
+# 8. Указываем команду запуска
 # Нам нужно прописать путь к библиотекам, чтобы программа их нашла
 ENV LD_LIBRARY_PATH="/app/third_party/onnxruntime-linux-x64-gpu-1.23.2/lib:${LD_LIBRARY_PATH}"
 

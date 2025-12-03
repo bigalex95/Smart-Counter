@@ -4,6 +4,7 @@
 #include "tracker.h"
 #include "fps_counter.h"
 #include <set>
+#include "database.h"
 
 void print_usage(const char *program_name)
 {
@@ -12,6 +13,7 @@ void print_usage(const char *program_name)
               << "  --model <path>      Path to ONNX model (default: models/yolov8s.onnx)\n"
               << "  --input <path>      Path to input video (default: data/videos/853889-hd_1920_1080_25fps.mp4)\n"
               << "  --output <path>     Path to output video (default: data/output/output.mp4)\n"
+              << "  --db <path>         Path to SQLite database (default: logs/analytics.db)\n"
               << "  --headless          Run without display window (save to file only)\n"
               << "  --cpu               Use CPU only (default: GPU if available)\n"
               << "  --help              Show this help message\n"
@@ -19,6 +21,7 @@ void print_usage(const char *program_name)
               << "  " << program_name << " --input video.mp4\n"
               << "  " << program_name << " --model models/yolov8n.onnx --headless\n"
               << "  " << program_name << " --input video.mp4 --output result.mp4 --cpu\n"
+              << "  " << program_name << " --db data_logs/analytics.db\n"
               << std::endl;
 }
 
@@ -28,6 +31,7 @@ int main(int argc, char **argv)
     std::string model_path = "models/yolov8s.onnx";
     std::string video_path = "data/videos/853889-hd_1920_1080_25fps.mp4";
     std::string output_path = "data/output/output.mp4";
+    std::string db_path = "logs/analytics.db";
     bool headless_mode = false;
     bool use_gpu = true;
 
@@ -61,6 +65,10 @@ int main(int argc, char **argv)
         {
             output_path = argv[++i];
         }
+        else if (arg == "--db" && i + 1 < argc)
+        {
+            db_path = argv[++i];
+        }
         else if (arg.substr(0, 2) == "--")
         {
             std::cerr << "Unknown option: " << arg << std::endl;
@@ -68,6 +76,10 @@ int main(int argc, char **argv)
             return 1;
         }
     }
+
+    // Initialize database with configured path
+    Database db(db_path);
+    db.init();
 
     if (headless_mode)
     {
@@ -77,6 +89,7 @@ int main(int argc, char **argv)
     std::cout << "📁 Model: " << model_path << std::endl;
     std::cout << "📹 Input: " << video_path << std::endl;
     std::cout << "💾 Output: " << output_path << std::endl;
+    std::cout << "💿 Database: " << db_path << std::endl;
     std::cout << "⚡ Using: " << (use_gpu ? "GPU" : "CPU") << std::endl;
 
     // Инициализация детектора
@@ -122,6 +135,8 @@ int main(int argc, char **argv)
         }
     }
 
+    int last_saved_count = 0; // Чтобы не спамить в БД
+
     cv::Mat frame;
     while (true)
     {
@@ -164,6 +179,17 @@ int main(int argc, char **argv)
                     line_color = cv::Scalar(0, 0, 255);
                 }
             }
+        }
+
+        // ЛОГИКА СОХРАНЕНИЯ
+        int current_count = counted_ids.size();
+
+        // Пишем в базу, только если счетчик увеличился
+        if (current_count > last_saved_count)
+        {
+            db.insert_log(current_count);
+            last_saved_count = current_count;
+            std::cout << "📦 Data saved to DB: " << current_count << std::endl;
         }
 
         // Рисуем линию подсчета (цвет меняется на красный при подсчете)
