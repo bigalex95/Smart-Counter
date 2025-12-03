@@ -13,6 +13,7 @@ YOLODetector::YOLODetector(const std::string &model_path, bool use_cuda)
     session_options = SessionOptions();
 
     // 2. Подключение CUDA (если есть)
+    bool cuda_enabled = false;
     if (use_cuda)
     {
         // Пытаемся подключить CUDA провайдер
@@ -23,16 +24,47 @@ YOLODetector::YOLODetector(const std::string &model_path, bool use_cuda)
             OrtCUDAProviderOptions cuda_options;
             session_options.AppendExecutionProvider_CUDA(cuda_options);
             cout << "✅ CUDA provider enabled." << endl;
+            cuda_enabled = true;
         }
         catch (const std::exception &e)
         {
-            cerr << "⚠️ Failed to enable CUDA: " << e.what() << endl;
-            cout << "⚠️ Using CPU fallback." << endl;
+            cerr << "⚠️ Failed to enable CUDA provider: " << e.what() << endl;
+            cout << "⚠️ Will try CPU fallback." << endl;
         }
     }
 
-    // 3. Загрузка модели
-    session = Session(env, model_path.c_str(), session_options);
+    // 3. Загрузка модели с обработкой ошибок CUDA
+    try
+    {
+        session = Session(env, model_path.c_str(), session_options);
+        if (cuda_enabled)
+        {
+            cout << "✅ Model loaded with CUDA acceleration." << endl;
+        }
+        else
+        {
+            cout << "✅ Model loaded with CPU inference." << endl;
+        }
+    }
+    catch (const std::exception &e)
+    {
+        // Если CUDA была включена, но инициализация не удалась - пробуем CPU
+        if (cuda_enabled)
+        {
+            cerr << "⚠️ CUDA initialization failed: " << e.what() << endl;
+            cout << "🔄 Retrying with CPU-only mode..." << endl;
+
+            // Пересоздаем session_options без CUDA
+            session_options = SessionOptions();
+            session = Session(env, model_path.c_str(), session_options);
+            cout << "✅ Model loaded with CPU inference (fallback)." << endl;
+        }
+        else
+        {
+            // Если это не связано с CUDA - прокидываем ошибку дальше
+            throw;
+        }
+    }
 
     // 4. Получение информации о входах и выходах
     // (Упрощенно берем 0-й вход и 0-й выход, так как у YOLOv8 их по одному)

@@ -1,0 +1,46 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDEs and editors
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build artifacts
+build/
+*.o
+*.a
+*.so
+*.dylib
+
+# Python
+python/
+.venv
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# Logs and temporary files
+logs/
+tmp/
+*.log
+*.tmp
+
+# Output (generated at runtime)
+data/output/*
+
+# CI/CD
+.github/
+.gitlab-ci.yml
