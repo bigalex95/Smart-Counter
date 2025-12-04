@@ -1,0 +1,59 @@
+services:
+  # 1. C++ Detector Service
+  detector:
+    build: .  # Uses Dockerfile from root
+    image: smart-counter-cpp
+    container_name: smart-counter-backend
+    # GPU settings
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    # Display passthrough (for cv2.imshow if not headless)
+    environment:
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+      # CLI arguments via environment variables
+      - MODEL_PATH=${MODEL_PATH:-models/yolov8s.onnx}
+      - INPUT_VIDEO=${INPUT_VIDEO:-data/videos/853889-hd_1920_1080_25fps.mp4}
+      - OUTPUT_VIDEO=${OUTPUT_VIDEO:-data/output/output.mp4}
+      - DB_PATH=${DB_PATH:-logs/analytics.db}
+      - HEADLESS_MODE=${HEADLESS_MODE:-true}
+      - USE_CPU=${USE_CPU:-false}
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ./logs:/app/logs:rw  # Shared folder for database
+      - ./data:/app/data:rw  # Access to videos and output
+      - ./models:/app/models:ro  # Access to models
+    # Override CMD with environment-based arguments
+    command: >
+      bash -c "
+      /app/scripts/check_cuda.sh &&
+      ./build/SmartCounter
+      --model $${MODEL_PATH}
+      --input $${INPUT_VIDEO}
+      --output $${OUTPUT_VIDEO}
+      --db $${DB_PATH}
+      $${HEADLESS_MODE:+--headless}
+      $${USE_CPU:+--cpu}
+      "
+
+  # 2. Python Dashboard Service
+  dashboard:
+    build: ./dashboard  # Uses Dockerfile from dashboard folder
+    container_name: smart-counter-frontend
+    ports:
+      - "${DASHBOARD_PORT:-8501}:8501"  # Configurable port
+    environment:
+      # Dashboard CLI arguments via environment variables
+      - DB_PATH=${DASHBOARD_DB_PATH:-/app/logs/analytics.db}
+      - REFRESH_INTERVAL=${REFRESH_INTERVAL:-2}
+      - DATA_LIMIT=${DATA_LIMIT:-100}
+    volumes:
+      - ./logs:/app/logs:ro  # Read-only access to shared database
+    depends_on:
+      - detector
+    restart: unless-stopped

@@ -1,5 +1,6 @@
 import time
 import cv2
+import argparse
 from ultralytics import YOLO  # type: ignore
 from utils.fps_utils import (
     measure_fps_from_seconds,
@@ -7,11 +8,51 @@ from utils.fps_utils import (
     ms_sum,
 )
 
+
+def parse_args():
+    """Parse command-line arguments"""
+    parser = argparse.ArgumentParser(description="Smart Counter Prototype with YOLOv8")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="models/yolov8s.pt",
+        help="Path to YOLO model file (default: models/yolov8s.pt)",
+    )
+    parser.add_argument(
+        "--input",
+        type=str,
+        default="data/videos/853889-hd_1920_1080_25fps.mp4",
+        help="Path to input video file (default: data/videos/853889-hd_1920_1080_25fps.mp4)",
+    )
+    parser.add_argument(
+        "--line-position",
+        type=float,
+        default=0.5,
+        help="Counting line position as fraction of frame height (default: 0.5 for middle)",
+    )
+    parser.add_argument(
+        "--tolerance",
+        type=int,
+        default=20,
+        help="Detection zone tolerance around counting line in pixels (default: 20)",
+    )
+    parser.add_argument(
+        "--stats-interval",
+        type=int,
+        default=60,
+        help="Print statistics every N frames (default: 60)",
+    )
+    return parser.parse_args()
+
+
+# Parse command-line arguments
+args = parse_args()
+
 # 1. Load the model
-model = YOLO("models/yolov8s.pt")
+model = YOLO(args.model)
 
 # 2. Open video file
-cap = cv2.VideoCapture("data/videos/853889-hd_1920_1080_25fps.mp4")
+cap = cv2.VideoCapture(args.input)
 
 # Check if video opened successfully
 if not cap.isOpened():
@@ -21,9 +62,9 @@ if not cap.isOpened():
 frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-# Define counting line position (middle of the frame)
-line_y = frame_height // 2
-line_tolerance = 20  # Zone around the line for detection
+# Define counting line position (based on command-line argument)
+line_y = int(frame_height * args.line_position)
+line_tolerance = args.tolerance  # Zone around the line for detection
 
 # Create set to store counted IDs
 counted_ids = set()
@@ -137,8 +178,8 @@ while True:
     system_times_s.append(loop_end - loop_start)
     frame_count += 1
 
-    # Periodic running averages
-    if frame_count > 0 and frame_count % 60 == 0:
+    # Periodic running averages (based on --stats-interval)
+    if frame_count > 0 and frame_count % args.stats_interval == 0:
         running_model_fps = (
             measure_fps_from_milliseconds(model_times_ms) if model_times_ms else 0.0
         )
