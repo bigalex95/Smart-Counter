@@ -29,11 +29,12 @@ Database::~Database()
 
 void Database::init()
 {
-    // Создаем простую таблицу: ID, Время, Значение
+    // Создаем таблицу с двумя счетчиками: вход и выход
     const char *sql = "CREATE TABLE IF NOT EXISTS people_count ("
                       "id INTEGER PRIMARY KEY AUTOINCREMENT,"
                       "timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,"
-                      "count INTEGER NOT NULL);";
+                      "in_count INTEGER NOT NULL,"
+                      "out_count INTEGER NOT NULL);";
 
     char *errMsg = 0;
     int rc = sqlite3_exec(db, sql, 0, 0, &errMsg);
@@ -48,11 +49,12 @@ void Database::init()
     }
 }
 
-void Database::insert_log(int count)
+void Database::insert_log(int in_count, int out_count)
 {
     // В реальном коде лучше использовать Prepared Statements, чтобы избежать инъекций,
     // но для Int это безопасно.
-    std::string sql = "INSERT INTO people_count (count) VALUES (" + std::to_string(count) + ");";
+    std::string sql = "INSERT INTO people_count (in_count, out_count) VALUES (" +
+                      std::to_string(in_count) + ", " + std::to_string(out_count) + ");";
 
     char *errMsg = 0;
     int rc = sqlite3_exec(db, sql.c_str(), 0, 0, &errMsg);

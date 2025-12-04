@@ -1,5 +1,9 @@
+# Docker Compose configuration for GPU-enabled deployment
+# Usage: docker compose -f docker-compose-gpu.yml up -d
+# Or use: ./run compose-up-gpu
+
 services:
-  # 1. C++ Detector Service
+  # 1. C++ Detector Service (GPU-enabled)
   detector:
     build: .  # Uses Dockerfile from root
     image: smart-counter-cpp
@@ -29,7 +33,7 @@ services:
       - ./logs:/app/logs:rw  # Shared folder for database
       - ./data:/app/data:rw  # Access to videos and output
       - ./models:/app/models:ro  # Access to models
-    # Override CMD with environment-based arguments
+    # Override CMD with environment-based arguments (GPU-enabled, no --cpu flag)
     command: >
       bash -c "
       /app/scripts/check_cuda.sh &&
@@ -40,7 +44,6 @@ services:
       --db $${DB_PATH}
       $${HEADLESS_MODE:+--headless}
       $${LOOP_VIDEO:+--loop}
-      $${USE_CPU:+--cpu}
       "
 
   # 2. Python Dashboard Service

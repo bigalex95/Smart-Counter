@@ -12,8 +12,8 @@ public:
     // Создает таблицу, если её нет
     void init();
 
-    // Сохраняет текущее значение счетчика
-    void insert_log(int count);
+    // Сохраняет счетчики входа и выхода
+    void insert_log(int in_count, int out_count);
 
 private:
     sqlite3 *db;

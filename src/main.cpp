@@ -119,6 +119,10 @@ int main(int argc, char **argv)
     std::set<int> counted_ids;
     int line_y = cap.get(cv::CAP_PROP_FRAME_HEIGHT) / 2; // Линия на середине кадра
 
+    // Счетчики входа и выхода
+    int count_in = 0;
+    int count_out = 0;
+
     // FPS counter for tracking performance
     FPSCounter fps_counter;
 
@@ -183,9 +187,8 @@ int main(int argc, char **argv)
         // 2. Трекинг (превращаем просто боксы в объекты с ID)
         auto tracked_objects = tracker.update(detections);
 
-        // 3. Логика подсчета и отрисовка
-        const int line_tolerance = 20;    // Зона вокруг линии для детекции
-        cv::Scalar line_color(0, 255, 0); // По умолчанию зеленая
+        // 3. Логика двунаправленного подсчета
+        cv::Scalar line_color(0, 255, 255); // По умолчанию желтая
 
         for (const auto &obj : tracked_objects)
         {
@@ -198,41 +201,64 @@ int main(int argc, char **argv)
             // Рисуем центральную точку
             cv::circle(frame, obj.center, 5, cv::Scalar(0, 255, 0), -1);
 
-            // Логика пересечения
-            if (obj.center.y > line_y - line_tolerance && obj.center.y < line_y + line_tolerance)
+            // Логика векторного пересечения
+            // Условие 1: Сейчас ниже линии, был выше (ВХОД / DOWN)
+            if (obj.previous_center.y < line_y && obj.center.y >= line_y)
             {
                 if (counted_ids.find(obj.id) == counted_ids.end())
                 {
+                    count_in++;
                     counted_ids.insert(obj.id);
-                    // Меняем цвет линии на красный для визуальной обратной связи
-                    line_color = cv::Scalar(0, 0, 255);
+                    line_color = cv::Scalar(0, 255, 0); // Зеленый миг
+                }
+            }
+
+            // Условие 2: Сейчас выше линии, был ниже (ВЫХОД / UP)
+            if (obj.previous_center.y > line_y && obj.center.y <= line_y)
+            {
+                if (counted_ids.find(obj.id) == counted_ids.end())
+                {
+                    count_out++;
+                    counted_ids.insert(obj.id);
+                    line_color = cv::Scalar(0, 0, 255); // Красный миг
                 }
             }
         }
 
         // ЛОГИКА СОХРАНЕНИЯ
-        int current_count = counted_ids.size();
+        int current_count = count_in + count_out;
 
         // Пишем в базу, только если счетчик увеличился
         if (current_count > last_saved_count)
         {
-            db.insert_log(current_count);
+            db.insert_log(count_in, count_out);
             last_saved_count = current_count;
-            std::cout << "📦 Data saved to DB: " << current_count << std::endl;
+            std::cout << "📦 Data saved to DB: IN=" << count_in << " OUT=" << count_out << std::endl;
         }
 
-        // Рисуем линию подсчета (цвет меняется на красный при подсчете)
+        // Рисуем линию подсчета (цвет меняется при пересечении)
         cv::line(frame, cv::Point(0, line_y), cv::Point(frame.cols, line_y), line_color, 2);
 
-        // Рисуем зону толерантности (желтые линии)
-        cv::line(frame, cv::Point(0, line_y - line_tolerance),
-                 cv::Point(frame.cols, line_y - line_tolerance), cv::Scalar(0, 255, 255), 1);
-        cv::line(frame, cv::Point(0, line_y + line_tolerance),
-                 cv::Point(frame.cols, line_y + line_tolerance), cv::Scalar(0, 255, 255), 1);
+        // Вычисляем занятость (сколько внутри)
+        int occupancy = count_in - count_out;
+        int corrected_occupancy = std::max(0, occupancy); // Защита от отрицательных значений
 
-        // Вывод счетчика
-        cv::putText(frame, "Count: " + std::to_string(counted_ids.size()),
-                    cv::Point(10, 50), cv::FONT_HERSHEY_SIMPLEX, 1.5, cv::Scalar(0, 255, 255), 3);
+        // Рисуем информационную панель
+        cv::rectangle(frame, cv::Point(0, 0), cv::Point(300, 140), cv::Scalar(0, 0, 0), -1);
+        cv::putText(frame, "IN: " + std::to_string(count_in),
+                    cv::Point(10, 40), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 0), 2);
+        cv::putText(frame, "OUT: " + std::to_string(count_out),
+                    cv::Point(10, 80), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 255), 2);
+
+        // Показываем корректированное значение с предупреждением о дрейфе
+        cv::Scalar occupancy_color = (occupancy < 0) ? cv::Scalar(0, 165, 255) : cv::Scalar(255, 255, 255);
+        std::string occupancy_text = "INSIDE: " + std::to_string(corrected_occupancy);
+        if (occupancy < 0)
+        {
+            occupancy_text += " (!" + std::to_string(occupancy) + ")";
+        }
+        cv::putText(frame, occupancy_text,
+                    cv::Point(10, 120), cv::FONT_HERSHEY_SIMPLEX, 0.8, occupancy_color, 2);
 
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -260,7 +286,8 @@ int main(int argc, char **argv)
         {
             std::cout << "Frame " << frame_count << " — Avg FPS: " << avg_fps
                       << ", Instant FPS: " << instant_fps
-                      << ", Count: " << counted_ids.size() << std::endl;
+                      << ", IN: " << count_in << ", OUT: " << count_out
+                      << ", INSIDE: " << (count_in - count_out) << std::endl;
         }
 
         // Отображение или запись в зависимости от режима

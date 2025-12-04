@@ -64,28 +64,43 @@ case "${1:-help}" in
     
     # Docker Compose tasks
     compose-up)
-        echo -e "${BLUE}Starting services with docker-compose...${NC}"
+        echo -e "${BLUE}Starting services with docker-compose (CPU mode)...${NC}"
         docker compose up -d
+        ;;
+    
+    compose-up-gpu)
+        echo -e "${BLUE}Starting services with docker-compose (GPU mode)...${NC}"
+        docker compose -f docker-compose-gpu.yml up -d
         ;;
     
     compose-down)
         echo -e "${BLUE}Stopping services with docker-compose...${NC}"
         docker compose down
+        docker compose -f docker-compose-gpu.yml down 2>/dev/null || true
         ;;
     
     compose-logs)
         echo -e "${BLUE}Showing docker-compose logs...${NC}"
-        docker compose logs -f "${2:-}"
+        if [ -f "docker-compose-gpu.yml" ] && docker compose -f docker-compose-gpu.yml ps -q &>/dev/null; then
+            docker compose -f docker-compose-gpu.yml logs -f "${2:-}"
+        else
+            docker compose logs -f "${2:-}"
+        fi
         ;;
     
     compose-restart)
         echo -e "${BLUE}Restarting services with docker-compose...${NC}"
-        docker compose restart "${2:-}"
+        if [ -f "docker-compose-gpu.yml" ] && docker compose -f docker-compose-gpu.yml ps -q &>/dev/null; then
+            docker compose -f docker-compose-gpu.yml restart "${2:-}"
+        else
+            docker compose restart "${2:-}"
+        fi
         ;;
     
     compose-build)
         echo -e "${BLUE}Building services with docker-compose...${NC}"
         docker compose build
+        docker compose -f docker-compose-gpu.yml build
         ;;
     
     # Deployment
@@ -157,7 +172,8 @@ case "${1:-help}" in
         echo "  run-docker-headless Run in Docker headless (no display)"
         echo ""
         echo -e "${YELLOW}Docker Compose Commands:${NC}"
-        echo "  compose-up         Start all services with docker-compose"
+        echo "  compose-up         Start all services with docker-compose (CPU mode)"
+        echo "  compose-up-gpu     Start all services with docker-compose (GPU mode)"
         echo "  compose-down       Stop all services with docker-compose"
         echo "  compose-logs       Show logs (optionally specify service: detector/dashboard)"
         echo "  compose-restart    Restart services (optionally specify service)"
@@ -182,7 +198,8 @@ case "${1:-help}" in
         echo "  ./run setup                                    # Initial setup"
         echo "  ./run build                                    # Build project"
         echo "  ./run run-docker                               # Run with GPU and display"
-        echo "  ./run compose-up                               # Start with docker-compose"
+        echo "  ./run compose-up                               # Start with docker-compose (CPU)"
+        echo "  ./run compose-up-gpu                           # Start with docker-compose (GPU)"
         echo "  ./run compose-logs detector                    # Show detector logs"
         echo "  ./run compose-down                             # Stop docker-compose"
         echo "  ./run deploy                                   # Deploy as service"
@@ -190,10 +207,10 @@ case "${1:-help}" in
         echo ""
         echo -e "${YELLOW}Advanced Usage (with custom paths):${NC}"
         echo "  # Run with custom input video"
-        echo "  sudo docker run --rm -it --gpus all --display \\"
-        echo "    -e DISPLAY=\$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix \\"
-        echo "    -v \$(pwd)/my_video.mp4:/app/input.mp4 \\"
-        echo "    smart-counter-cpp \\"
+        echo '  sudo docker run --rm -it --gpus all --display \'
+        echo '    -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix \'
+        echo '    -v $(pwd)/my_video.mp4:/app/input.mp4 \'
+        echo '    smart-counter-cpp \'
         echo "    bash -c './build/SmartCounter --input /app/input.mp4 --display'"
         echo ""
         echo "  # Or use the deploy script directly"

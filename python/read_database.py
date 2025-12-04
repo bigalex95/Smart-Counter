@@ -45,17 +45,18 @@ def show_statistics(conn):
     cursor.execute(
         """
         SELECT 
-            MIN(count) as min_count,
-            MAX(count) as max_count,
-            AVG(count) as avg_count
+            MAX(in_count) as max_in,
+            MAX(out_count) as max_out,
+            AVG(in_count - out_count) as avg_occupancy
         FROM people_count
     """
     )
-    min_count, max_count, avg_count = cursor.fetchone()
+    max_in, max_out, avg_occupancy = cursor.fetchone()
 
-    print(f"Minimum count: {min_count}")
-    print(f"Maximum count: {max_count}")
-    print(f"Average count: {avg_count:.2f}")
+    print(f"Total IN: {max_in}")
+    print(f"Total OUT: {max_out}")
+    print(f"Average Occupancy: {avg_occupancy:.2f}")
+    print(f"Current Inside: {max_in - max_out if max_in and max_out else 0}")
     print()
 
 
@@ -64,7 +65,7 @@ def show_recent_records(conn, limit: int = 10):
     cursor = conn.cursor()
     cursor.execute(
         """
-        SELECT id, timestamp, count 
+        SELECT id, timestamp, in_count, out_count
         FROM people_count 
         ORDER BY timestamp DESC 
         LIMIT ?
@@ -78,12 +79,15 @@ def show_recent_records(conn, limit: int = 10):
         return
 
     print(f"📝 Last {limit} Records")
-    print("=" * 50)
-    print(f"{'ID':<6} {'Timestamp':<20} {'Count':<6}")
-    print("-" * 50)
+    print("=" * 70)
+    print(f"{'ID':<6} {'Timestamp':<20} {'IN':<6} {'OUT':<6} {'INSIDE':<8}")
+    print("-" * 70)
 
-    for record_id, timestamp, count in records:
-        print(f"{record_id:<6} {timestamp:<20} {count:<6}")
+    for record_id, timestamp, in_count, out_count in records:
+        inside = in_count - out_count
+        print(
+            f"{record_id:<6} {timestamp:<20} {in_count:<6} {out_count:<6} {inside:<8}"
+        )
     print()
 
 
@@ -95,9 +99,9 @@ def show_daily_summary(conn):
         SELECT 
             DATE(timestamp) as date,
             COUNT(*) as records,
-            MIN(count) as min_count,
-            MAX(count) as max_count,
-            AVG(count) as avg_count
+            MAX(in_count) as total_in,
+            MAX(out_count) as total_out,
+            AVG(in_count - out_count) as avg_occupancy
         FROM people_count
         GROUP BY DATE(timestamp)
         ORDER BY date DESC
@@ -110,13 +114,15 @@ def show_daily_summary(conn):
         return
 
     print("📅 Daily Summary")
-    print("=" * 70)
-    print(f"{'Date':<12} {'Records':<10} {'Min':<6} {'Max':<6} {'Avg':<8}")
-    print("-" * 70)
+    print("=" * 80)
+    print(
+        f"{'Date':<12} {'Records':<10} {'Total IN':<10} {'Total OUT':<10} {'Avg Occupancy':<15}"
+    )
+    print("-" * 80)
 
-    for date, record_count, min_count, max_count, avg_count in records:
+    for date, record_count, total_in, total_out, avg_occupancy in records:
         print(
-            f"{date:<12} {record_count:<10} {min_count:<6} {max_count:<6} {avg_count:<8.2f}"
+            f"{date:<12} {record_count:<10} {total_in:<10} {total_out:<10} {avg_occupancy:<15.2f}"
         )
     print()
 
@@ -128,11 +134,12 @@ def export_to_csv(conn, output_file: str = "export.csv"):
 
     with open(output_file, "w") as f:
         # Write header
-        f.write("id,timestamp,count\n")
+        f.write("id,timestamp,in_count,out_count,occupancy\n")
 
         # Write data
         for row in cursor.fetchall():
-            f.write(f"{row[0]},{row[1]},{row[2]}\n")
+            occupancy = row[2] - row[3]  # in_count - out_count
+            f.write(f"{row[0]},{row[1]},{row[2]},{row[3]},{occupancy}\n")
 
     print(f"✅ Data exported to: {output_file}")
 
