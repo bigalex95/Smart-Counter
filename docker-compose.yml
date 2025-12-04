@@ -22,6 +22,7 @@ services:
       - OUTPUT_VIDEO=${OUTPUT_VIDEO:-data/output/output.mp4}
       - DB_PATH=${DB_PATH:-logs/analytics.db}
       - HEADLESS_MODE=${HEADLESS_MODE:-true}
+      - LOOP_VIDEO=${LOOP_VIDEO:-true}
       - USE_CPU=${USE_CPU:-false}
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
@@ -38,6 +39,7 @@ services:
       --output $${OUTPUT_VIDEO}
       --db $${DB_PATH}
       $${HEADLESS_MODE:+--headless}
+      $${LOOP_VIDEO:+--loop}
       $${USE_CPU:+--cpu}
       "
 

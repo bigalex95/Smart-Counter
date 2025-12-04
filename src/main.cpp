@@ -15,13 +15,14 @@ void print_usage(const char *program_name)
               << "  --output <path>     Path to output video (default: data/output/output.mp4)\n"
               << "  --db <path>         Path to SQLite database (default: logs/analytics.db)\n"
               << "  --headless          Run without display window (save to file only)\n"
+              << "  --loop              Loop video infinitely (for camera-like streaming)\n"
               << "  --cpu               Use CPU only (default: GPU if available)\n"
               << "  --help              Show this help message\n"
               << "\nExamples:\n"
               << "  " << program_name << " --input video.mp4\n"
-              << "  " << program_name << " --model models/yolov8n.onnx --headless\n"
+              << "  " << program_name << " --model models/yolov8n.onnx --headless --loop\n"
               << "  " << program_name << " --input video.mp4 --output result.mp4 --cpu\n"
-              << "  " << program_name << " --db data_logs/analytics.db\n"
+              << "  " << program_name << " --db data_logs/analytics.db --loop\n"
               << std::endl;
 }
 
@@ -33,6 +34,7 @@ int main(int argc, char **argv)
     std::string output_path = "data/output/output.mp4";
     std::string db_path = "logs/analytics.db";
     bool headless_mode = false;
+    bool loop_video = false;
     bool use_gpu = true;
 
     // Parse command-line arguments
@@ -48,6 +50,10 @@ int main(int argc, char **argv)
         else if (arg == "--headless")
         {
             headless_mode = true;
+        }
+        else if (arg == "--loop")
+        {
+            loop_video = true;
         }
         else if (arg == "--cpu")
         {
@@ -90,6 +96,7 @@ int main(int argc, char **argv)
     std::cout << "📹 Input: " << video_path << std::endl;
     std::cout << "💾 Output: " << output_path << std::endl;
     std::cout << "💿 Database: " << db_path << std::endl;
+    std::cout << "🔁 Loop mode: " << (loop_video ? "enabled" : "disabled") << std::endl;
     std::cout << "⚡ Using: " << (use_gpu ? "GPU" : "CPU") << std::endl;
 
     // Инициализация детектора
@@ -104,6 +111,10 @@ int main(int argc, char **argv)
         std::cerr << "Error: Could not open video!" << std::endl;
         return -1;
     }
+
+    // Узнаем FPS видео, чтобы проигрывать с правильной скоростью
+    double video_fps = cap.get(cv::CAP_PROP_FPS);
+    int delay_ms = 1000 / video_fps; // Например, 1000/25 = 40 мс
 
     std::set<int> counted_ids;
     int line_y = cap.get(cv::CAP_PROP_FRAME_HEIGHT) / 2; // Линия на середине кадра
@@ -141,8 +152,26 @@ int main(int argc, char **argv)
     while (true)
     {
         cap >> frame;
+        // If video ended - restart from beginning (if loop enabled) or exit
         if (frame.empty())
-            break;
+        {
+            if (loop_video)
+            {
+                std::cout << "🔁 Video ended, restarting from beginning..." << std::endl;
+                cap.set(cv::CAP_PROP_POS_FRAMES, 0);
+                cap >> frame;
+                if (frame.empty())
+                {
+                    std::cerr << "❌ Error: Cannot restart video" << std::endl;
+                    break;
+                }
+            }
+            else
+            {
+                std::cout << "✅ Video processing completed" << std::endl;
+                break;
+            }
+        }
 
         // Запуск детекции
         // Засекаем время для честного FPS
@@ -242,12 +271,14 @@ int main(int argc, char **argv)
             {
                 video_writer.write(frame);
             }
+            // Small delay to control processing speed and allow database writes
+            cv::waitKey(1);
         }
         else
         {
             // В обычном режиме показываем окно
             cv::imshow("C++ YOLOv8 Inference", frame);
-            if (cv::waitKey(1) == 'q')
+            if (cv::waitKey(delay_ms) == 'q')
                 break;
         }
     }
