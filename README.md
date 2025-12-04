@@ -1,122 +1,69 @@
-# 🚀 Smart-Counter
+# 🚗 Smart-Counter: Edge AI Traffic Analytics
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![C++](https://img.shields.io/badge/C++-17-blue.svg)](https://isocpp.org/)
 [![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
 
-**A production-ready, end-to-end real-time video analytics system for people counting and footfall analysis.**
+**High-performance people counting system with C++ (OpenCV, ONNX Runtime) + YOLOv8. Designed for edge devices with real-time analytics dashboard.**
 
-Most "AI video projects" stop at a notebook demo. Smart-Counter is designed for **actual production deployment** on edge devices and servers, with a fully optimized C++ engine built for real-world performance.
-
----
-
-## 📝 Overview
-
-Smart-Counter is a comprehensive people-counting system that goes beyond simple detection. It provides:
-
-- **Real-time video processing** with optimized C++ engine
-- **Accurate people detection** using YOLO family models
-- **Robust object tracking** with stable ID assignment across frames
-- **Intelligent counting logic** with virtual lines, zones, and direction tracking
-- **Analytics layer** for footfall metrics, occupancy, and heatmaps
-- **Production deployment** ready for edge devices or cloud
+Most "AI video projects" stop at a notebook demo. Smart-Counter is built for **production deployment** — optimized C++ inference engine, persistent analytics storage, and Dockerized deployment.
 
 ---
 
-## ✨ Key Features
+## 🚀 Key Features
 
-### 🎥 Real-Time Engine (Built for Performance)
-
-The system was prototyped in Python, then **rebuilt entirely in C++ with ONNX Runtime** for:
-
-- ✅ **Real-time speed** on edge devices
-- ✅ **Low latency** video processing
-- ✅ **Reliable deployment** with minimal dependencies
-- ✅ **GPU acceleration** support (CUDA)
-
-### 🧠 Custom ML Pipeline
-
-Inside the engine:
-
-- **Video preprocessing** – Efficient decoding, resizing, and frame management
-- **Object detection** – YOLOv8 for high-accuracy person detection
-- **Object tracking** – Persistent ID assignment with BoTSORT/ByteTrack
-- **Counting logic** – Virtual lines, zones, direction detection, and staff exclusion rules
-- **Visualization** – Real-time annotated video output with metrics
-
-All wrapped in a **clean, modular architecture** that's easy to extend.
-
-### 📊 Analytics Layer
-
-Beyond simple counting, Smart-Counter provides:
-
-- **Footfall analytics** – Track people entering/exiting zones
-- **Occupancy monitoring** – Real-time capacity tracking
-- **Time-based metrics** – Peak hours, dwell time analysis
-- **SQLite database** – Persistent storage with automatic logging (see [docs/DATABASE.md](docs/DATABASE.md))
-- **Heatmaps** – Visualize high-traffic areas
-- **Extensible hooks** – Add age/gender estimation or custom business rules
-
-### 🚀 Deployable End-to-End
-
-Designed with **MLOps principles** in mind:
-
-- ✅ Runs on edge devices (Jetson, Raspberry Pi) or servers
-- ✅ API-ready architecture
-- ✅ Easy monitoring and logging
-- ✅ Integration with dashboards and cloud analytics
-- ✅ Fully open-source – deploy anywhere
+- **⚡ Real-Time Detection** – YOLOv8 on GPU using ONNX Runtime (C++) achieving ~100 FPS on RTX 3060
+- **🎯 Bi-Directional Counting** – Tracks both entry (IN) and exit (OUT) flows with virtual counting lines
+- **💾 Data Persistence** – SQLite database logs all analytics with automatic drift protection
+- **📊 Live Dashboard** – Streamlit-based real-time visualization with historical analytics
+- **🐳 Fully Dockerized** – One-command deployment with Docker Compose (CPU/GPU support)
+- **🔧 Production Ready** – Modular architecture, error handling, and comprehensive logging
 
 ---
 
-## 🏗️ Architecture
+## 🛠 Tech Stack
+
+| Component           | Technology                                |
+| ------------------- | ----------------------------------------- |
+| **Core Engine**     | C++17, OpenCV 4.8+                        |
+| **AI Inference**    | ONNX Runtime (CUDA Execution Provider)    |
+| **Detection Model** | YOLOv8 (Ultralytics)                      |
+| **Tracking**        | Custom Centroid Tracker with state memory |
+| **Database**        | SQLite3 with analytics schema             |
+| **Dashboard**       | Python 3.9+, Streamlit, Pandas            |
+| **Build System**    | CMake 3.10+                               |
+| **DevOps**          | Docker, Docker Compose                    |
+
+---
+
+## 🏗 Architecture
 
 ```
-┌─────────────┐
-│    Video    │
-└──────┬──────┘
+┌──────────────┐
+│ Video Source │
+└──────┬───────┘
        │
        ▼
-┌─────────────────┐
-│ 1. Preprocessing│  ← Decoding, resizing frames
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  2. Detection   │  ← YOLOv8 finds people (bounding boxes)
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  3. Tracking    │  ← Assigns IDs, tracks movement
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  4. Counting    │  ← Counts line crossings
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│5. Visualization │  ← Draws results
-└─────────────────┘
+┌─────────────────────────────────────────┐
+│     C++ Detector (YOLO + Tracker)       │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐ │
+│  │  Detect │→ │  Track  │→ │  Count  │ │
+│  └─────────┘  └─────────┘  └─────────┘ │
+└──────────┬──────────────────────────────┘
+           │
+           ▼
+    ┌─────────────┐
+    │  SQLite DB  │  ← Persistent Analytics
+    └──────┬──────┘
+           │
+           ▼
+  ┌──────────────────┐
+  │ Python Dashboard │  ← Real-time Visualization
+  └──────────────────┘
 ```
 
-**For detailed architecture documentation, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
-
----
-
-## 🛠️ Technology Stack
-
-| Component            | Technology              |
-| -------------------- | ----------------------- |
-| **Core Engine**      | C++17 with ONNX Runtime |
-| **Prototype**        | Python 3.9+             |
-| **Detection Model**  | YOLOv8 (Ultralytics)    |
-| **Tracking**         | BoTSORT / ByteTrack     |
-| **Computer Vision**  | OpenCV 4.8+             |
-| **Build System**     | CMake 3.10+             |
-| **GPU Acceleration** | CUDA + cuDNN (optional) |
+**Detailed documentation:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | [docs/BI_DIRECTIONAL_COUNTING.md](docs/BI_DIRECTIONAL_COUNTING.md)
 
 ---
 
@@ -124,52 +71,55 @@ Designed with **MLOps principles** in mind:
 
 ### Prerequisites
 
-- **Linux** (Ubuntu 20.04+, Fedora, Arch, or similar)
-- **CMake** 3.10+
-- **OpenCV** 4.8+
-- **Python** 3.9+ (for model conversion)
-- **CUDA + cuDNN** (optional, for GPU acceleration)
+- **Docker** & **Docker Compose**
+- **NVIDIA GPU** + **NVIDIA Container Toolkit** (for GPU acceleration)
+- **Linux** (Ubuntu 20.04+, or similar)
 
-### Installation
-
-1. **Clone the repository**
+### 🐳 Docker Deployment (Recommended)
 
 ```bash
+# 1. Clone repository
 git clone https://github.com/bigalex95/Smart-Counter.git
 cd Smart-Counter
+
+# 2. Allow X11 forwarding (for visualization)
+xhost +local:docker
+
+# 3. Build and run
+docker compose up --build
 ```
 
-2. **Run the setup script** (automated installation)
+The dashboard will be available at **`http://localhost:8501`**
+
+**GPU Support:** See [docs/DOCKER_COMPOSE_GPU.md](docs/DOCKER_COMPOSE_GPU.md)  
+**Configuration:** Edit `.env` file or use environment variables
+
+### 🔧 Native Build (Development)
+
+For development or edge deployment without Docker:
 
 ```bash
-./scripts/setup.sh
-```
-
-This script will:
-
-- Install system dependencies
-- Download ONNX Runtime (GPU or CPU version)
-- Set up Python virtual environment
-- Download YOLOv8 model
-- Convert model to ONNX format
-
-3. **Build the C++ engine**
-
-```bash
+# 1. Build C++ engine
 ./scripts/build.sh
-```
 
-4. **Run the application**
+# 2. Run detector
+./build/SmartCounter --model models/yolov8s.onnx \
+                     --input data/videos/video.mp4 \
+                     --db logs/analytics.db
 
-```bash
-./scripts/run.sh
-```
-
-Or use the combined script:
-
-```bash
+# Or use combined script
 ./scripts/build_and_run.sh
 ```
+
+**Available scripts:**
+
+- `build.sh` – Build C++ project
+- `run.sh` – Run the detector
+- `build_and_run.sh` – Build and run in one step
+- `check_cuda.sh` – Check CUDA availability
+- `test_database.sh` – Test database connection
+
+See [docs/CLI_USAGE.md](docs/CLI_USAGE.md) for all CLI options.
 
 ---
 
@@ -177,131 +127,150 @@ Or use the combined script:
 
 ```
 Smart-Counter/
-├── src/              # C++ source code
-│   ├── main.cpp      # Main application entry
-│   └── detector.cpp  # YOLO detector implementation
-├── include/          # C++ headers
-│   └── detector.h    # Detector interface
-├── python/           # Python prototype and utilities
-│   ├── prototype.py  # Python-based people counter
-│   └── convert.py    # Model conversion to ONNX
-├── scripts/          # Build and deployment scripts
-│   ├── setup.sh      # Automated setup
-│   ├── build.sh      # Build C++ project
-│   └── run.sh        # Run application
-├── models/           # ML models (YOLO weights, ONNX)
-├── data/             # Input videos and output results
-│   ├── videos/       # Video files
-│   └── output/       # Processed results
-├── docs/             # Documentation
-│   ├── ARCHITECTURE.md  # System architecture
-│   └── TECH_STACK.md    # Technology details
-└── CMakeLists.txt    # CMake build configuration
+├── src/                    # C++ source code (Detector, Tracker, Database)
+│   ├── main.cpp            # Main application entry
+│   ├── detector.cpp        # YOLO inference engine
+│   ├── tracker.cpp         # Centroid tracking algorithm
+│   └── database.cpp        # SQLite analytics logger
+├── include/                # C++ headers
+├── dashboard/              # Python Streamlit analytics dashboard
+│   ├── app.py              # Real-time dashboard UI
+│   └── Dockerfile          # Dashboard container
+├── python/                 # Python utilities
+│   ├── prototype.py        # Python prototype (testing)
+│   └── convert.py          # ONNX model conversion
+├── scripts/                # Build and deployment automation
+├── models/                 # ONNX models (YOLOv8)
+├── data/                   # Videos and output
+├── logs/                   # SQLite database (analytics.db)
+├── docs/                   # Comprehensive documentation
+├── docker-compose.yml      # Multi-container orchestration
+├── Dockerfile              # C++ backend container
+└── CMakeLists.txt          # Build configuration
 ```
 
 ---
 
-## 🎯 Usage
+## 🎯 Usage Examples
 
-### Python Prototype (Quick Testing)
+### Docker Compose Deployment
 
-Perfect for rapid prototyping and testing:
+```bash
+# Run with custom video and settings
+MODEL_PATH=models/yolov8s.onnx \
+INPUT_VIDEO=data/videos/my_video.mp4 \
+HEADLESS_MODE=true \
+docker compose up
+```
+
+### Standalone C++ Detector
+
+```bash
+./build/SmartCounter \
+  --model models/yolov8s.onnx \
+  --input data/videos/video.mp4 \
+  --output data/output/result.mp4 \
+  --db logs/analytics.db \
+  --headless \
+  --loop
+```
+
+### Python Dashboard (Standalone)
+
+```bash
+cd dashboard
+streamlit run app.py -- --db ../logs/analytics.db
+```
+
+### Python Prototype (Testing)
 
 ```bash
 source venv/bin/activate
 python python/prototype.py
 ```
 
-Features:
-
-- YOLOv8 detection + tracking
-- Line crossing counter
-- Real-time FPS display
-- Visual feedback
-
-### C++ Engine (Production)
-
-Optimized for deployment:
-
-```bash
-./build/SmartCounter
-```
-
-Features:
-
-- High-performance ONNX inference
-- GPU acceleration support
-- Low memory footprint
-- Production-ready
-
 ---
 
 ## 🔧 Configuration
 
-### Model Selection
+### Environment Variables (Docker)
 
-Choose the right YOLOv8 variant for your needs:
-
-| Model     | Speed      | Accuracy     | Use Case                   |
-| --------- | ---------- | ------------ | -------------------------- |
-| `yolov8n` | ⚡⚡⚡⚡⚡ | ⭐⭐⭐       | Edge devices, high FPS     |
-| `yolov8s` | ⚡⚡⚡⚡   | ⭐⭐⭐⭐     | **Recommended** (balanced) |
-| `yolov8m` | ⚡⚡⚡     | ⭐⭐⭐⭐⭐   | More accuracy needed       |
-| `yolov8l` | ⚡⚡       | ⭐⭐⭐⭐⭐⭐ | High accuracy priority     |
-| `yolov8x` | ⚡         | ⭐⭐⭐⭐⭐⭐ | Maximum accuracy           |
-
-### Counting Line Setup
-
-Modify the counting line position in `src/main.cpp` or `python/prototype.py`:
-
-```cpp
-int line_y = frame_height / 2;  // Horizontal line at 50%
-int line_tolerance = 20;         // Detection zone
+```bash
+MODEL_PATH=models/yolov8s.onnx     # Model path
+INPUT_VIDEO=data/videos/video.mp4  # Input video
+OUTPUT_VIDEO=data/output/out.mp4   # Output video
+DB_PATH=logs/analytics.db          # Database path
+HEADLESS_MODE=true                 # No GUI display
+LOOP_VIDEO=true                    # Loop video playback
+USE_CPU=false                      # Force CPU inference
 ```
 
+### CLI Arguments (Native)
+
+```bash
+./build/SmartCounter --help
+
+Options:
+  --model PATH      Path to ONNX model
+  --input PATH      Input video file
+  --output PATH     Output video file (optional)
+  --db PATH         SQLite database path
+  --headless        Run without GUI
+  --loop            Loop video playback
+  --cpu             Use CPU instead of GPU
+```
+
+See [docs/CLI_USAGE.md](docs/CLI_USAGE.md) for advanced configuration.
+
 ---
 
-## 📊 Performance
+## 📊 Performance Benchmarks
 
-### Python Prototype
+| Component           | Performance           |
+| ------------------- | --------------------- |
+| **Inference (GPU)** | ~100 FPS (YOLOv8s)    |
+| **Full Pipeline**   | ~50-80 FPS            |
+| **Latency**         | < 20ms per frame      |
+| **Memory**          | ~2GB GPU / ~500MB CPU |
 
-- **Model FPS**: ~30-60 FPS (depending on hardware)
-- **System FPS**: ~25-45 FPS (full pipeline)
+_Tested on NVIDIA GeForce RTX 3060 Laptop GPU with YOLOv8s_
 
-### C++ Engine
+### Model Comparison
 
-- **Inference**: ~60-100+ FPS on GPU
-- **Full Pipeline**: ~50-80 FPS
-- **Latency**: < 20ms per frame
-
-_Benchmarks on NVIDIA GeForce RTX 3060 Laptop GPU with YOLOv8s_
+| Model     | Speed      | Accuracy     | Recommended For        |
+| --------- | ---------- | ------------ | ---------------------- |
+| `yolov8n` | ⚡⚡⚡⚡⚡ | ⭐⭐⭐       | Edge devices, high FPS |
+| `yolov8s` | ⚡⚡⚡⚡   | ⭐⭐⭐⭐     | **Balanced (default)** |
+| `yolov8m` | ⚡⚡⚡     | ⭐⭐⭐⭐⭐   | Higher accuracy        |
+| `yolov8l` | ⚡⚡       | ⭐⭐⭐⭐⭐⭐ | Maximum accuracy       |
 
 ---
 
-## 🚀 Deployment
+## 🚀 Deployment Options
 
-### Edge Devices
+### 🐳 Docker (Production)
 
-Smart-Counter can run on:
+```bash
+# CPU-only deployment
+docker compose up
 
-- **NVIDIA Jetson** (Nano, Xavier, Orin)
-- **Raspberry Pi 4** (with optimization)
-- **Edge servers** (Intel NUC, etc.)
+# GPU deployment
+docker compose -f docker-compose-gpu.yml up
+```
 
-### Cloud Deployment
+### 🌐 Cloud Platforms
 
-- Containerize with Docker
-- Deploy on AWS, GCP, Azure
-- Use Kubernetes for scaling
-- Integrate with cloud analytics platforms
+- **AWS**: ECS/EKS with GPU instances
+- **GCP**: Cloud Run / GKE with T4/V100
+- **Azure**: Container Instances with GPU
 
-### API Integration
+### 🔌 Edge Devices
 
-The system is designed to be API-ready:
+- **NVIDIA Jetson** (Nano, Xavier, Orin) – Optimized for edge AI
+- **Intel NUC** – CPU inference mode
+- **Custom hardware** – Via ONNX Runtime compatibility
 
-- RESTful API for video streams
-- WebSocket for real-time updates
-- gRPC for high-performance communication
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed deployment guides.
 
 ---
 
@@ -342,10 +311,68 @@ Project Link: [https://github.com/bigalex95/Smart-Counter](https://github.com/bi
 
 ---
 
-## 🎓 Learn More
+## 📚 Documentation
 
-- [Architecture Documentation](docs/ARCHITECTURE.md) – System design and data flow
-- [Technology Stack](docs/TECH_STACK.md) – Detailed tech specs and resources
+- **[Quick Start Guide](docs/QUICKSTART.md)** – Get running in 5 minutes
+- **[Architecture Overview](docs/ARCHITECTURE.md)** – System design and data flow
+- **[Bi-Directional Counting](docs/BI_DIRECTIONAL_COUNTING.md)** – How counting works
+- **[Database Schema](docs/DATABASE.md)** – Analytics storage structure
+- **[CLI Usage](docs/CLI_USAGE.md)** – Command-line reference
+- **[Docker Compose Guide](docs/DOCKER_COMPOSE.md)** – Container deployment
+- **[Deployment Guide](docs/DEPLOYMENT.md)** – Production deployment strategies
+- **[Tech Stack Details](docs/TECH_STACK.md)** – Technology deep dive
+
+---
+
+## 🎯 What Makes This Different?
+
+Most computer vision projects are:
+
+- ❌ Python-only (slow, not production-ready)
+- ❌ No tracking (just detection)
+- ❌ No persistence (analytics lost on restart)
+- ❌ No deployment story (hard to run)
+
+**Smart-Counter is:**
+
+- ✅ **Production C++** – Optimized for real-world performance
+- ✅ **Complete Pipeline** – Detection → Tracking → Counting → Analytics
+- ✅ **Data Persistence** – SQLite with automatic logging
+- ✅ **Deploy Anywhere** – Docker, cloud, edge devices
+
+---
+
+## ✅ Current Implementation
+
+**What's Working Now:**
+
+- ✅ **C++ Inference Engine** – YOLOv8 ONNX Runtime with GPU/CPU support
+- ✅ **Custom Centroid Tracker** – Simple, fast tracking algorithm
+- ✅ **Bi-Directional Counting** – Tracks IN/OUT flows across counting line
+- ✅ **SQLite Database** – Persistent analytics storage with drift protection
+- ✅ **Streamlit Dashboard** – Real-time visualization and historical data
+- ✅ **Docker Deployment** – Multi-container setup with docker-compose
+- ✅ **CLI Interface** – Full command-line control with multiple options
+- ✅ **Video Recording** – Output processed video with annotations
+
+---
+
+## 🚧 Roadmap (Coming Soon)
+
+**Planned Improvements:**
+
+- 🔜 **Advanced Tracking** – Replace simple tracker with BoTSORT/ByteTrack
+- 🔜 **Multi-Zone Support** – Define multiple counting zones
+- 🔜 **Heatmap Generation** – Visualize traffic patterns
+- 🔜 **REST API** – HTTP API for integration with other systems
+- 🔜 **WebSocket Streaming** – Real-time video feed to dashboard
+- 🔜 **Model Optimization** – TensorRT support for even faster inference
+- 🔜 **Multi-Camera Support** – Process multiple video streams
+- 🔜 **Alert System** – Notifications for crowd thresholds
+- 🔜 **Time-Series Analytics** – Advanced statistical analysis
+- 🔜 **Cloud Storage Integration** – S3/GCS for video archival
+
+**Contributions welcome!** See [Contributing](#-contributing) section.
 
 ---
 
