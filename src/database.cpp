@@ -1,14 +1,21 @@
 #include "database.h"
 #include <chrono>
 #include <ctime>
-#include <sys/stat.h>
+#include <filesystem>
+#include <system_error>
 #include <iostream>
 
 Database::Database(const std::string &path) : db_path(path), db(nullptr)
 {
-    // Ensure directory exists
-    std::string dir_path = path.substr(0, path.find_last_of("/"));
-    mkdir(dir_path.c_str(), 0755);
+    // Ensure the parent directory exists (nothing to create for a bare file name)
+    std::filesystem::path parent = std::filesystem::path(path).parent_path();
+    if (!parent.empty())
+    {
+        std::error_code ec;
+        std::filesystem::create_directories(parent, ec);
+        if (ec)
+            std::cerr << "Can't create directory " << parent << ": " << ec.message() << std::endl;
+    }
 
     int rc = sqlite3_open(path.c_str(), &db);
     if (rc)

@@ -12,7 +12,7 @@ C++17 pipeline that detects people with YOLOv8 (ONNX Runtime + OpenCV), tracks t
 
 - YOLOv8 inference in C++ via ONNX Runtime (CUDA execution provider, CPU fallback) with OpenCV pre/post-processing and NMS.
 - Centroid tracker for the `person` class and bi-directional line-crossing counter (IN = downward, OUT = upward, each track counted once).
-- Tracker and line-crossing logic are separated from ONNX Runtime and covered by 27 GoogleTest unit tests that run in CI without a GPU.
+- Tracker and line-crossing logic are separated from ONNX Runtime and covered by 29 GoogleTest unit tests (tracker, line counter, SQLite logger) that run in CI without a GPU.
 - Counter snapshots are stored in SQLite; a Streamlit dashboard reads the same file.
 - Docker / Docker Compose files for the detector and the dashboard.
 
@@ -98,7 +98,7 @@ Fixed in code for now: confidence threshold 0.5, NMS IoU 0.45, tracker gate 50 p
 
 ## Tests and CI
 
-The unit tests cover the tracker (ID assignment, persistence, distance gate, disappearance and re-appearance, non-person filtering) and the line counter (IN / OUT, no crossing, exact-line cases, one count per ID) including synthetic tracker + counter walks. They need only OpenCV and GoogleTest, not ONNX Runtime:
+The unit tests cover the tracker (ID assignment, persistence, distance gate, disappearance and re-appearance, non-person filtering) and the line counter (IN / OUT, no crossing, exact-line cases, one count per ID) including synthetic tracker + counter walks, plus the SQLite logger (bare file name and nested directory paths). They need OpenCV, SQLite3 and GoogleTest, not ONNX Runtime:
 
 ```bash
 cmake -S . -B build-tests -DSMARTCOUNTER_BUILD_APP=OFF -DSMARTCOUNTER_BUILD_TESTS=ON
@@ -143,4 +143,4 @@ Roadmap: replace the centroid tracker with ByteTrack / BoT-SORT, configurable co
 
 ## License
 
-MIT, see [LICENSE](LICENSE). Copyright (c) Alibek Erkabayev.
+MIT, see [LICENSE](LICENSE). Copyright (c) 2025 Alibek Erkabayev.

@@ -15,10 +15,14 @@ if(NOT GTest_FOUND)
 endif()
 
 include(GoogleTest)
+find_package(SQLite3 REQUIRED)
 
 add_executable(smartcounter_tests
     test_tracker.cpp
     test_line_counter.cpp
+    test_database.cpp
+    ${CMAKE_SOURCE_DIR}/src/database.cpp
 )
-target_link_libraries(smartcounter_tests PRIVATE smartcounter_core GTest::gtest_main)
+target_link_libraries(smartcounter_tests PRIVATE smartcounter_core ${SQLite3_LIBRARIES} GTest::gtest_main)
+target_include_directories(smartcounter_tests PRIVATE ${SQLite3_INCLUDE_DIRS})
 gtest_discover_tests(smartcounter_tests)

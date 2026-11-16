@@ -1,6 +1,6 @@
 # Database
 
-The detector logs counter snapshots to a SQLite file (default `logs/analytics.db`, override with `--db` / `DB_PATH`). The file and its directory are created on first start.
+The detector logs counter snapshots to a SQLite file (default `logs/analytics.db`, override with `--db` / `DB_PATH`). The file is created on first start, together with any missing parent directories (a bare file name such as `--db analytics.db` uses the current directory).
 
 ## Schema
 
