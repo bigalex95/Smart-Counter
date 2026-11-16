@@ -1,0 +1,5 @@
+# GitHub language statistics: the project is C++; helper scripts and docs should not dominate it.
+scripts/** linguist-vendored
+run linguist-vendored
+docs/** linguist-documentation
+uv.lock linguist-generated

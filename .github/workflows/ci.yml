@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake g++ libopencv-dev libsqlite3-dev libgtest-dev
+
+      # The unit tests cover the tracker and line-crossing logic only, which need
+      # OpenCV but not ONNX Runtime, SQLite or a GPU.
+      - name: Configure
+        run: cmake -S . -B build-tests -DCMAKE_BUILD_TYPE=Release -DSMARTCOUNTER_BUILD_APP=OFF -DSMARTCOUNTER_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build-tests -j"$(nproc)"
+
+      - name: Test
+        run: ctest --test-dir build-tests --output-on-failure

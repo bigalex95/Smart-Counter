@@ -9,10 +9,10 @@ public:
     Database(const std::string &db_path);
     ~Database();
 
-    // Создает таблицу, если её нет
+    // Creates the table if it does not exist
     void init();
 
-    // Сохраняет счетчики входа и выхода
+    // Saves the entry and exit counters
     void insert_log(int in_count, int out_count);
 
 private:

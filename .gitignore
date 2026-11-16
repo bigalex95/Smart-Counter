@@ -5,6 +5,7 @@ __pycache__/
 *.so
 .Python
 build/
+build*/
 develop-eggs/
 dist/
 downloads/
@@ -50,8 +51,9 @@ data/videos/*
 data/output/*
 !data/output/.gitkeep
 
-# Models (large files)
+# Models (large files): see README "Model" section for how to export
 models/*.pt
+models/*.onnx
 !models/.gitkeep
 
 # Testing

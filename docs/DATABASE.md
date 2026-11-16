@@ -1,235 +1,40 @@
-# База Данных (SQLite) 📊
+# Database
 
-## Описание
+The detector logs counter snapshots to a SQLite file (default `logs/analytics.db`, override with `--db` / `DB_PATH`). The file is created on first start, together with any missing parent directories (a bare file name such as `--db analytics.db` uses the current directory).
 
-Smart Counter использует SQLite для хранения статистики подсчета людей. База данных автоматически создается при первом запуске и сохраняет данные в файл `logs/analytics.db`.
-
-## Структура Таблицы
+## Schema
 
 ```sql
-CREATE TABLE people_count (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+CREATE TABLE IF NOT EXISTS people_count (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    count INTEGER NOT NULL
+    in_count  INTEGER NOT NULL,   -- cumulative IN since the process started
+    out_count INTEGER NOT NULL    -- cumulative OUT since the process started
 );
 ```
 
-### Поля:
+`in_count` and `out_count` are running totals of the current run, not per-interval deltas. Occupancy is derived as `in_count - out_count`.
 
-- **id** - Уникальный идентификатор записи (автоинкремент)
-- **timestamp** - Время записи (устанавливается автоматически)
-- **count** - Количество подсчитанных людей
+## When rows are written
 
-## Логика Сохранения
+A row is inserted only when `in_count + out_count` increases, i.e. once per counted crossing, not once per frame.
 
-Программа записывает данные в базу **только при увеличении счетчика**. Это предотвращает избыточные записи (30+ записей в секунду) и экономит место на диске.
-
-```cpp
-// Пример из main.cpp
-if (current_count > last_saved_count) {
-    db.insert_log(current_count);
-    last_saved_count = current_count;
-    std::cout << "📦 Data saved to DB: " << current_count << std::endl;
-}
-```
-
-## Docker Volume для Персистентности
-
-### Проблема
-
-Если база данных создается внутри контейнера, она удаляется при удалении контейнера.
-
-### Решение
-
-Используем Docker Volume для монтирования папки `logs` на хост-машину:
+## Looking at the data
 
 ```bash
-docker run -it --rm \
-    --gpus all \
-    -v $(pwd)/logs:/app/logs \
-    smart-counter-cpp
+# sqlite3 CLI
+sqlite3 logs/analytics.db "SELECT * FROM people_count ORDER BY id DESC LIMIT 10;"
+
+# Summary / CSV export helper
+python python/read_database.py --help
+
+# Dashboard
+streamlit run dashboard/app.py -- --db logs/analytics.db
 ```
 
-### Автоматический запуск с deploy.sh
+The dashboard's "Reset Counters" button runs `DELETE FROM people_count`, so in Docker the `logs/` volume must be mounted read-write (the compose files do this).
 
-Скрипт `scripts/deploy.sh` автоматически монтирует том:
+## Notes
 
-```bash
-# Запуск с GPU и сохранением БД
-./scripts/deploy.sh run --gpu
-
-# Или с кастомными параметрами
-./scripts/deploy.sh run --input video.mp4 --gpu
-```
-
-## Просмотр Данных
-
-### 1. Через SQLite CLI
-
-```bash
-# Установка (если нужна)
-sudo apt install sqlite3
-
-# Открыть базу
-sqlite3 logs/analytics.db
-
-# SQL команды
-sqlite> .tables
-sqlite> SELECT * FROM people_count LIMIT 10;
-sqlite> SELECT COUNT(*) FROM people_count;
-sqlite> SELECT * FROM people_count ORDER BY timestamp DESC LIMIT 5;
-```
-
-### 2. Через DB Browser for SQLite (GUI)
-
-1. Скачать: https://sqlitebrowser.org/
-2. Открыть файл `logs/analytics.db`
-3. Просмотр таблиц и выполнение запросов
-
-### 3. Через Python
-
-```python
-import sqlite3
-import pandas as pd
-
-# Подключение к базе
-conn = sqlite3.connect('logs/analytics.db')
-
-# Чтение всех данных
-df = pd.read_sql_query("SELECT * FROM people_count", conn)
-print(df)
-
-# Статистика
-print(f"Всего записей: {len(df)}")
-print(f"Максимум людей: {df['count'].max()}")
-print(f"Средний показатель: {df['count'].mean():.2f}")
-
-conn.close()
-```
-
-## Примеры SQL Запросов
-
-### Получить последние 10 записей
-
-```sql
-SELECT * FROM people_count
-ORDER BY timestamp DESC
-LIMIT 10;
-```
-
-### Средний счетчик за день
-
-```sql
-SELECT DATE(timestamp) as date, AVG(count) as avg_count
-FROM people_count
-GROUP BY DATE(timestamp);
-```
-
-### Максимальное значение счетчика
-
-```sql
-SELECT MAX(count) as max_count, timestamp
-FROM people_count;
-```
-
-### Изменение счетчика за последний час
-
-```sql
-SELECT * FROM people_count
-WHERE timestamp >= datetime('now', '-1 hour')
-ORDER BY timestamp;
-```
-
-## Интеграция в Код
-
-### Инициализация
-
-```cpp
-#include "database.h"
-
-// В main.cpp
-Database db("logs/analytics.db");
-db.init();  // Создает таблицу, если её нет
-```
-
-### Запись данных
-
-```cpp
-int people_count = 42;
-db.insert_log(people_count);
-```
-
-## Очистка Базы
-
-```bash
-# Удалить базу данных
-rm logs/analytics.db
-
-# Или очистить таблицу (через sqlite3)
-sqlite3 logs/analytics.db "DELETE FROM people_count;"
-```
-
-## Troubleshooting
-
-### База не создается
-
-1. Проверить, что папка `logs/` существует
-2. Проверить права доступа: `chmod 755 logs/`
-3. В Docker проверить монтирование: `docker inspect <container_id> | grep Mounts -A 10`
-
-### База удаляется после перезапуска контейнера
-
-- Убедитесь, что используется volume: `-v $(pwd)/logs:/app/logs`
-- Проверьте, что путь указан правильно
-
-### Ошибки записи в БД
-
-- Проверить логи программы
-- Убедиться, что SQLite3 установлен в контейнере
-- Проверить, что библиотека слинкована в CMakeLists.txt
-
-## Дальнейшие Улучшения
-
-1. **Prepared Statements** - для защиты от SQL-инъекций
-2. **Batch Insert** - групповая запись для оптимизации
-3. **Индексы** - для ускорения запросов
-4. **Ротация логов** - автоматическая очистка старых данных
-5. **API endpoint** - REST API для получения статистики
-6. **Дашборд** - визуализация данных в реальном времени
-
-## Связанные Файлы
-
-- `include/database.h` - заголовочный файл класса Database
-- `src/database.cpp` - реализация класса Database
-- `src/main.cpp` - интеграция БД в основной цикл
-- `CMakeLists.txt` - линковка SQLite3
-- `Dockerfile` - установка libsqlite3-dev
-
-## Пример Работы
-
-```bash
-# 1. Собрать образ
-docker build -t smart-counter-cpp .
-
-# 2. Запустить с монтированием logs
-docker run -it --rm \
-    --gpus all \
-    -v $(pwd)/logs:/app/logs \
-    smart-counter-cpp
-
-# 3. После работы проверить базу
-sqlite3 logs/analytics.db "SELECT COUNT(*) FROM people_count;"
-
-# 4. Экспорт в CSV
-sqlite3 -header -csv logs/analytics.db "SELECT * FROM people_count;" > analytics_export.csv
-```
-
-## Заключение
-
-SQLite идеально подходит для Edge-устройств:
-
-- ✅ Не требует отдельного сервера
-- ✅ Быстрая и легковесная
-- ✅ Надежная (ACID-совместимая)
-- ✅ Легко встраивается в C++
-- ✅ Поддержка SQL для сложных запросов
+- `insert_log` builds the SQL string from two `int` values; the inputs are never user-supplied text. Prepared statements would be the cleaner choice.
+- `Database` does not retry or surface errors beyond printing to stderr.

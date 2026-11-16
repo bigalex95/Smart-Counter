@@ -1,14 +1,21 @@
 #include "database.h"
 #include <chrono>
 #include <ctime>
-#include <sys/stat.h>
+#include <filesystem>
+#include <system_error>
 #include <iostream>
 
 Database::Database(const std::string &path) : db_path(path), db(nullptr)
 {
-    // Ensure directory exists
-    std::string dir_path = path.substr(0, path.find_last_of("/"));
-    mkdir(dir_path.c_str(), 0755);
+    // Ensure the parent directory exists (nothing to create for a bare file name)
+    std::filesystem::path parent = std::filesystem::path(path).parent_path();
+    if (!parent.empty())
+    {
+        std::error_code ec;
+        std::filesystem::create_directories(parent, ec);
+        if (ec)
+            std::cerr << "Can't create directory " << parent << ": " << ec.message() << std::endl;
+    }
 
     int rc = sqlite3_open(path.c_str(), &db);
     if (rc)
@@ -29,7 +36,7 @@ Database::~Database()
 
 void Database::init()
 {
-    // Создаем таблицу с двумя счетчиками: вход и выход
+    // Create a table with two counters: entries and exits
     const char *sql = "CREATE TABLE IF NOT EXISTS people_count ("
                       "id INTEGER PRIMARY KEY AUTOINCREMENT,"
                       "timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,"
@@ -51,8 +58,8 @@ void Database::init()
 
 void Database::insert_log(int in_count, int out_count)
 {
-    // В реальном коде лучше использовать Prepared Statements, чтобы избежать инъекций,
-    // но для Int это безопасно.
+    // Real code should use prepared statements to avoid injection,
+    // but this is safe for integers.
     std::string sql = "INSERT INTO people_count (in_count, out_count) VALUES (" +
                       std::to_string(in_count) + ", " + std::to_string(out_count) + ");";
 

@@ -1,24 +1,24 @@
 #include "detector.h"
 #include <iostream>
 
-// Используем пространство имен для удобства
+// Use the namespace for convenience
 using namespace cv;
 using namespace std;
 using namespace Ort;
 
 YOLODetector::YOLODetector(const std::string &model_path, bool use_cuda)
 {
-    // 1. Настройка окружения
+    // 1. Environment setup
     env = Env(ORT_LOGGING_LEVEL_WARNING, "YOLODetector");
     session_options = SessionOptions();
 
-    // 2. Подключение CUDA (если есть)
+    // 2. CUDA setup (if available)
     bool cuda_enabled = false;
     if (use_cuda)
     {
-        // Пытаемся подключить CUDA провайдер
-        // В новых версиях API это делается через OrtSessionOptionsAppendExecutionProvider_CUDA
-        // Но C++ API обертка делает это проще (если собрана правильно):
+        // Try to enable the CUDA provider
+        // In newer API versions this is done via OrtSessionOptionsAppendExecutionProvider_CUDA
+        // But the C++ API wrapper makes this easier (if built correctly):
         try
         {
             OrtCUDAProviderOptions cuda_options;
@@ -33,7 +33,7 @@ YOLODetector::YOLODetector(const std::string &model_path, bool use_cuda)
         }
     }
 
-    // 3. Загрузка модели с обработкой ошибок CUDA
+    // 3. Load the model, handling CUDA errors
     try
     {
         session = Session(env, model_path.c_str(), session_options);
@@ -48,45 +48,45 @@ YOLODetector::YOLODetector(const std::string &model_path, bool use_cuda)
     }
     catch (const std::exception &e)
     {
-        // Если CUDA была включена, но инициализация не удалась - пробуем CPU
+        // If CUDA was enabled but initialization failed, fall back to CPU
         if (cuda_enabled)
         {
             cerr << "⚠️ CUDA initialization failed: " << e.what() << endl;
             cout << "🔄 Retrying with CPU-only mode..." << endl;
 
-            // Пересоздаем session_options без CUDA
+            // Recreate session_options without CUDA
             session_options = SessionOptions();
             session = Session(env, model_path.c_str(), session_options);
             cout << "✅ Model loaded with CPU inference (fallback)." << endl;
         }
         else
         {
-            // Если это не связано с CUDA - прокидываем ошибку дальше
+            // If the error is not CUDA-related, rethrow it
             throw;
         }
     }
 
-    // 4. Получение информации о входах и выходах
-    // (Упрощенно берем 0-й вход и 0-й выход, так как у YOLOv8 их по одному)
+    // 4. Get input and output information
+    // (Simplified: take input 0 and output 0, since YOLOv8 has one of each)
 
-    // ВАЖНО: В реальном коде имена нужно копировать, так как GetInputName возвращает умный указатель
-    // Здесь мы используем аллокатор для получения имен
+    // IMPORTANT: In real code the names must be copied, since GetInputName returns a smart pointer
+    // Here we use an allocator to get the names
     AllocatorWithDefaultOptions allocator;
 
-    // Получаем имя входа (обычно "images")
+    // Get the input name (usually "images")
     auto input_name_ptr = session.GetInputNameAllocated(0, allocator);
-    input_names.push_back(strdup(input_name_ptr.get())); // Копируем строку
+    input_names.push_back(strdup(input_name_ptr.get())); // Copy the string
 
-    // Получаем имя выхода (обычно "output0")
+    // Get the output name (usually "output0")
     auto output_name_ptr = session.GetOutputNameAllocated(0, allocator);
     output_names.push_back(strdup(output_name_ptr.get()));
 
-    // Получаем размер входа (обычно [1, 3, 640, 640])
+    // Get the input size (usually [1, 3, 640, 640])
     auto input_type_info = session.GetInputTypeInfo(0);
     auto input_tensor_info = input_type_info.GetTensorTypeAndShapeInfo();
     input_shape = input_tensor_info.GetShape();
 
-    // Если размер динамический (-1), фиксируем его
+    // If the size is dynamic (-1), fix it
     for (size_t i = 0; i < input_shape.size(); i++)
     {
         if (input_shape[i] == -1)
@@ -107,33 +107,33 @@ vector<Detection> YOLODetector::detect(Mat &image, float conf_threshold)
 {
     vector<Detection> detections;
 
-    // 1. Подготовка изображения (Preprocess)
-    // Цель: [1, 3, 640, 640] float32 tensor
+    // 1. Image preprocessing
+    // Goal: [1, 3, 640, 640] float32 tensor
     int input_w = input_shape[3];
     int input_h = input_shape[2];
 
     Mat blob;
-    // blobFromImage делает: Resize, BGR->RGB, Normalize (1/255), HWC->CHW
+    // blobFromImage does: Resize, BGR->RGB, Normalize (1/255), HWC->CHW
     cv::dnn::blobFromImage(image, blob, 1.0 / 255.0, Size(input_w, input_h), Scalar(), true, false);
 
-    // 2. Создание тензора
-    // Данные в blob уже лежат плоско (contiguous), можно передавать в ONNX Runtime
+    // 2. Create the tensor
+    // The blob data is already contiguous, so it can be passed to ONNX Runtime directly
     size_t input_tensor_size = input_shape[0] * input_shape[1] * input_shape[2] * input_shape[3];
     Value input_tensor = Value::CreateTensor<float>(
         MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault),
         (float *)blob.data, input_tensor_size, input_shape.data(), input_shape.size());
 
-    // 3. Инференс (Run) 🚀
+    // 3. Inference (Run)
     auto output_tensors = session.Run(
         RunOptions{nullptr},
         input_names.data(), &input_tensor, 1,
         output_names.data(), 1);
 
-    // 4. Разбор ответа (Postprocess)
+    // 4. Parse the output (Postprocess)
     // YOLOv8 Output shape: [1, 84, 8400] -> [Batch, (4 coords + 80 classes), NumAnchors]
     float *raw_output = output_tensors[0].GetTensorMutableData<float>();
 
-    // Получаем размеры выхода
+    // Get the output dimensions
     auto output_info = output_tensors[0].GetTensorTypeAndShapeInfo();
     auto output_dims = output_info.GetShape(); // [1, 84, 8400]
 
@@ -150,29 +150,29 @@ vector<Detection> YOLODetector::detect(Mat &image, float conf_threshold)
     int num_classes = output_dims[1] - 4; // 84 - 4 = 80
     int num_anchors = output_dims[2];     // 8400
 
-    // Вектора для NMS (Non-Maximum Suppression)
+    // Vectors for NMS (Non-Maximum Suppression)
     vector<int> class_ids;
     vector<float> confidences;
     vector<Rect> boxes;
 
-    // Считаем коэффициент масштабирования, чтобы вернуть боксы к размеру оригинала
+    // Compute the scale factor to map boxes back to the original size
     float x_factor = (float)image.cols / input_w;
     float y_factor = (float)image.rows / input_h;
 
     // YOLOv8 output is transposed compared to v5/v7 usually.
     // It's [Channels, Anchors]. We loop through anchors (columns).
 
-    // Данные лежат последовательно, но матрица [84, 8400].
-    // Значит шаг между атрибутами одного анкора = 8400.
+    // Data is stored sequentially, but the matrix is [84, 8400].
+    // So the stride between attributes of one anchor = 8400.
     // data[0][i] = x, data[1][i] = y ...
 
     for (int i = 0; i < num_anchors; i++)
     {
-        // Ищем класс с максимальной уверенностью
+        // Find the class with the highest confidence
         float max_score = 0.0;
         int max_class_id = -1;
 
-        // Пробегаем по классам (начинаются с 4-го ряда)
+        // Iterate over classes (starting from row 4)
         for (int c = 0; c < num_classes; c++)
         {
             float score = raw_output[(4 + c) * num_anchors + i];
@@ -185,13 +185,13 @@ vector<Detection> YOLODetector::detect(Mat &image, float conf_threshold)
 
         if (max_score > conf_threshold)
         {
-            // Извлекаем координаты
+            // Extract coordinates
             float cx = raw_output[0 * num_anchors + i];
             float cy = raw_output[1 * num_anchors + i];
             float w = raw_output[2 * num_anchors + i];
             float h = raw_output[3 * num_anchors + i];
 
-            // Переводим из центра в левый верхний угол и масштабируем
+            // Convert from center to top-left corner and scale
             int left = int((cx - 0.5 * w) * x_factor);
             int top = int((cy - 0.5 * h) * y_factor);
             int width = int(w * x_factor);
@@ -203,7 +203,7 @@ vector<Detection> YOLODetector::detect(Mat &image, float conf_threshold)
         }
     }
 
-    // 5. NMS (Убираем дубликаты)
+    // 5. NMS (remove duplicates)
     vector<int> nms_result;
     cv::dnn::NMSBoxes(boxes, confidences, conf_threshold, 0.45, nms_result);
 
