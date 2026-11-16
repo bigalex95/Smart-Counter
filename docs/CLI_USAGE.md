@@ -1,14 +1,6 @@
 # CLI Usage Guide
 
-All Python scripts have been refactored to use command-line arguments instead of hardcoded paths. This guide shows how to use each script with custom configurations.
-
-## 🎯 Overview
-
-All scripts now follow the same coding style as `main.cpp` and `read_database.py`:
-
-- Command-line arguments with sensible defaults
-- `--help` flag for usage information
-- Consistent argument naming across all scripts
+Command-line reference for the Python helpers. For the C++ binary run `./build/SmartCounter --help`.
 
 ---
 
@@ -310,5 +302,4 @@ streamlit run dashboard/app.py -- --db logs/test_analytics.db
 - Main documentation: `README.md`
 - Architecture details: `docs/ARCHITECTURE.md`
 - Database guide: `docs/DATABASE.md`
-- Deployment: `docs/DEPLOYMENT.md`
-- Quick start: `docs/QUICKSTART.md`
+- Docker: `docs/DOCKER.md`

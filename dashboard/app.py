@@ -45,7 +45,7 @@ st.set_page_config(page_title="Smart Counter Analytics", layout="wide")
 # Заголовок с кнопкой сброса
 col_title, col_reset = st.columns([4, 1])
 with col_title:
-    st.title("🚗 Smart Counter: Real-Time Analytics")
+    st.title("Smart Counter: People Counting Analytics")
 with col_reset:
     st.write("")  # Spacer
     if st.button("🔄 Reset Counters", help="Clear all counter data from database"):
@@ -132,7 +132,7 @@ while True:
 
         # Рисуем графики
         with chart_placeholder.container():
-            st.subheader("📊 Traffic Flow")
+            st.subheader("📊 Crossing flow")
 
             # Создаем DataFrame для графика с двумя линиями
             chart_data = df[["timestamp", "in_count", "out_count", "occupancy"]].copy()

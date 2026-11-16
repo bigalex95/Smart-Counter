@@ -1,228 +1,50 @@
-# 🏗️ Архитектура Smart Counter
+# Architecture
 
-## 📊 Общая схема
+Smart-Counter is two processes that communicate only through a SQLite file.
 
-```
-┌─────────────┐
-│   Видео     │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────────┐
-│  1. Preprocessing│  ← Декодирование, resize кадров
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  2. Detection   │  ← YOLOv8 находит людей (bounding boxes)
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  3. Tracking    │  ← Присваивает ID, отслеживает движение
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  4. Counting    │  ← Считает пересечения линии
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ 5. Visualization│  ← Рисует результаты
-└─────────────────┘
+```mermaid
+flowchart LR
+    V[Video file] --> D[YOLOv8 detector<br/>ONNX Runtime]
+    D -->|person boxes| T[Centroid tracker]
+    T -->|IDs + motion| L[Line crossing<br/>IN / OUT]
+    L -->|counters| DB[(SQLite<br/>logs/analytics.db)]
+    L --> O[Annotated frame<br/>window or mp4]
+    DB --> S[Streamlit dashboard]
 ```
 
-## 🔧 Компоненты системы
+## C++ pipeline (`src/`, `include/`)
 
-### 1. **Preprocessing (Предобработка)**
+| Component | Files | Responsibility |
+| --- | --- | --- |
+| Detector | `detector.cpp`, `detector.h` | Loads the ONNX model with ONNX Runtime (CUDA provider if available, CPU fallback). Resizes the frame to the model input (no letterboxing), decodes the YOLOv8 `[1, 84, 8400]` output, confidence threshold 0.5, NMS IoU 0.45. |
+| Tracker | `tracker.cpp`, `tracker.h` | `SimpleTracker`: centroid tracker for COCO class 0 (person) only. See "Tracker" below. |
+| Line counter | `line_counter.cpp`, `line_counter.h` | `LineCounter`: horizontal line at half of the frame height, counts IN / OUT per track ID. See "Counting" below. |
+| Database | `database.cpp`, `database.h` | Creates the `people_count` table and inserts counter snapshots. See [DATABASE.md](DATABASE.md). |
+| Main loop | `main.cpp` | CLI parsing, video I/O, drawing, FPS overlay, glue between the components above. |
 
-**Задача:** Подготовить видео для обработки
+`detection.h`, `tracker.h` and `line_counter.h` only depend on OpenCV core types. The `smartcounter_core` CMake target (tracker + line counter) is therefore built and unit-tested without ONNX Runtime, SQLite or a GPU (see [../tests/](../tests/)).
 
-- Декодирование видео (OpenCV)
-- Изменение размера кадров (resize)
-- Управление FPS (можно пропускать кадры)
+## Tracker
 
-**Входы:** Видеофайл
-**Выходы:** Кадры (numpy arrays)
+For each frame, detections of class 0 are reduced to box centres. Each centre is matched greedily to the nearest existing track centre closer than `distance_threshold` (default 50 px); otherwise a new track with a new ID is created. Unmatched tracks age by one frame and are deleted once they have been missed for more than `max_frames_missing` frames (default 5). Tracks missed for two or more frames are kept internally but not returned (to avoid drawing ghosts). IDs are never reused.
 
----
+Known weaknesses of this approach (no motion model, no appearance features, no one-to-one assignment: two detections can claim the same track) are listed in the README.
 
-### 2. **Detection (Детекция)**
+## Counting
 
-**Задача:** Найти всех людей на кадре
+`LineCounter::update` compares `previous_center.y` and `center.y` of each track with the line `y`:
 
-- YOLOv8 модель
-- На вход: кадр (изображение)
-- На выход: список bounding boxes
+- previous above the line and current on/below it: **IN** (downward)
+- previous below the line and current on/above it: **OUT** (upward)
 
-**Bounding Box содержит:**
+Each track ID is counted at most once, in whichever direction it crosses first. IDs are not re-armed, so a person who crosses, turns around and crosses back is counted once.
 
-- Координаты: `(x1, y1, x2, y2)`
-- Confidence: уверенность (0.0 - 1.0)
-- Class: класс объекта (0 = person)
+The line is fixed at half the frame height. There is no GUI for placing it (see Roadmap in the README).
 
----
+## Occupancy and drift
 
-### 3. **Tracking (Трекинг)**
+`INSIDE = IN - OUT`. Because the tracker can miss or duplicate crossings, this number can drift and even become negative. The overlay and the dashboard clamp the displayed value to 0 and show a warning that includes the raw (negative) value. This is a display safeguard, not a correction of the counts.
 
-**Задача:** Отследить кто есть кто между кадрами
+## Persistence
 
-Проблема: На кадре N у нас 5 человек, на кадре N+1 тоже 5 человек.
-Вопрос: Это те же самые люди или другие?
-
-**Решение:** Алгоритмы трекинга (BoTSORT, ByteTrack, DeepSORT)
-
-**Как работает:**
-
-1. Сравнивает bbox на кадре N и N+1
-2. Если bbox сместился чуть-чуть → это тот же человек
-3. Присваивает уникальный ID каждому человеку
-4. Ведёт историю движения
-
-**Track содержит:**
-
-- `track_id`: уникальный номер (1, 2, 3...)
-- `bbox`: текущие координаты
-- `history`: траектория движения
-- `age`: сколько кадров трек живёт
-
----
-
-### 4. **Counting (Подсчёт)**
-
-**Задача:** Посчитать сколько людей пересекло линию
-
-**Как работает:**
-
-1. Рисуем виртуальную линию (например, по центру экрана)
-2. Смотрим на центр каждого bbox
-3. Если центр на кадре N был **выше** линии, а на N+1 стал **ниже** → человек пересёк линию вниз (+1 вход)
-4. Если наоборот → пересёк вверх (+1 выход)
-
-**Важно:** Нужно помнить, какие ID уже посчитали, чтобы не считать дважды!
-
----
-
-### 5. **Visualization (Визуализация)**
-
-**Задача:** Нарисовать результаты на видео
-
-- Bounding boxes вокруг людей
-- ID треков
-- Линию подсчёта
-- Счётчик (IN/OUT/TOTAL)
-
----
-
-## 📦 Структура данных
-
-### Detection (одна детекция)
-
-```python
-{
-    "bbox": (x1, y1, x2, y2),      # Координаты прямоугольника
-    "confidence": 0.85,             # Уверенность
-    "class_id": 0,                  # ID класса (0 = person)
-    "center": (cx, cy)              # Центр bbox
-}
-```
-
-### Track (один трек)
-
-```python
-{
-    "track_id": 1,                  # Уникальный ID
-    "bbox": (x1, y1, x2, y2),      # Текущая позиция
-    "confidence": 0.85,             # Уверенность
-    "history": [(x1,y1), (x2,y2)],  # История центров
-    "age": 42                       # Сколько кадров живёт
-}
-```
-
-### CountingLine (линия подсчёта)
-
-```python
-{
-    "position": 0.5,                # 0.5 = по центру экрана
-    "orientation": "horizontal",    # horizontal или vertical
-    "start": (0, 540),              # Начало линии
-    "end": (1920, 540)              # Конец линии
-}
-```
-
----
-
-## 🔄 Поток данных (Data Flow)
-
-```
-Кадр (Frame)
-    ↓
-[Detection] → List[Detection]
-    ↓
-[Tracking] → List[Track]
-    ↓
-[Counting] → {"in": 10, "out": 5, "total": 15}
-    ↓
-[Visualization] → Annotated Frame (кадр с разметкой)
-```
-
----
-
-## 🎯 Ключевые алгоритмы
-
-### Алгоритм пересечения линии
-
-```python
-prev_y = предыдущая_позиция_центра_bbox.y
-curr_y = текущая_позиция_центра_bbox.y
-line_y = позиция_линии.y
-
-if prev_y > line_y and curr_y <= line_y:
-    # Пересёк сверху вниз
-    count_down += 1
-
-elif prev_y < line_y and curr_y >= line_y:
-    # Пересёк снизу вверх
-    count_up += 1
-```
-
-### IoU (Intersection over Union) - для трекинга
-
-```python
-# Используется для сопоставления bbox между кадрами
-IoU = площадь_пересечения / площадь_объединения
-
-if IoU > 0.3:
-    # Это тот же самый объект
-    update_track(track_id, new_bbox)
-else:
-    # Это новый объект
-    create_new_track()
-```
-
----
-
-## 💡 Советы по реализации
-
-### С чего начать:
-
-1. **Сначала**: Научись просто открывать видео и читать кадры (OpenCV)
-2. **Потом**: Запусти YOLO на одном кадре - получи детекции
-3. **Затем**: Запусти YOLO на всём видео - визуализируй bbox
-4. **Дальше**: Добавь трекинг (можно взять готовую библиотеку)
-5. **Наконец**: Добавь логику подсчёта
-
-### Частые ошибки:
-
-❌ Считать каждый bbox отдельно (без трекинга) → будешь считать одного человека 100 раз
-✅ Использовать track_id для подсчёта → каждый человек считается 1 раз
-
-❌ Сравнивать bbox напрямую между кадрами → очень сложно
-✅ Использовать готовые трекеры (BoTSORT, ByteTrack)
-
----
-
-## 🔗 Полезные материалы
-
-См. [TECH_STACK.md](TECH_STACK.md) для списка технологий и ссылок
+`main.cpp` writes a row `(in_count, out_count)` only when `IN + OUT` increases. The dashboard (`dashboard/app.py`) polls the same SQLite file.
