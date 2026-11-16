@@ -2,6 +2,7 @@
 #include <opencv2/opencv.hpp>
 #include "detector.h"
 #include "tracker.h"
+#include "line_counter.h"
 #include "fps_counter.h"
 #include <set>
 #include "database.h"
@@ -116,12 +117,10 @@ int main(int argc, char **argv)
     double video_fps = cap.get(cv::CAP_PROP_FPS);
     int delay_ms = 1000 / video_fps; // Например, 1000/25 = 40 мс
 
-    std::set<int> counted_ids;
     int line_y = cap.get(cv::CAP_PROP_FRAME_HEIGHT) / 2; // Линия на середине кадра
 
     // Счетчики входа и выхода
-    int count_in = 0;
-    int count_out = 0;
+    LineCounter line_counter(line_y);
 
     // FPS counter for tracking performance
     FPSCounter fps_counter;
@@ -201,32 +200,18 @@ int main(int argc, char **argv)
             // Рисуем центральную точку
             cv::circle(frame, obj.center, 5, cv::Scalar(0, 255, 0), -1);
 
-            // Логика векторного пересечения
-            // Условие 1: Сейчас ниже линии, был выше (ВХОД / DOWN)
-            if (obj.previous_center.y < line_y && obj.center.y >= line_y)
-            {
-                if (counted_ids.find(obj.id) == counted_ids.end())
-                {
-                    count_in++;
-                    counted_ids.insert(obj.id);
-                    line_color = cv::Scalar(0, 255, 0); // Зеленый миг
-                }
-            }
-
-            // Условие 2: Сейчас выше линии, был ниже (ВЫХОД / UP)
-            if (obj.previous_center.y > line_y && obj.center.y <= line_y)
-            {
-                if (counted_ids.find(obj.id) == counted_ids.end())
-                {
-                    count_out++;
-                    counted_ids.insert(obj.id);
-                    line_color = cv::Scalar(0, 0, 255); // Красный миг
-                }
-            }
+            // Логика векторного пересечения (см. line_counter.cpp)
+            Crossing crossing = line_counter.update(obj);
+            if (crossing == Crossing::In)
+                line_color = cv::Scalar(0, 255, 0); // Зеленый миг
+            else if (crossing == Crossing::Out)
+                line_color = cv::Scalar(0, 0, 255); // Красный миг
         }
 
         // ЛОГИКА СОХРАНЕНИЯ
-        int current_count = count_in + count_out;
+        int count_in = line_counter.count_in();
+        int count_out = line_counter.count_out();
+        int current_count = line_counter.total();
 
         // Пишем в базу, только если счетчик увеличился
         if (current_count > last_saved_count)

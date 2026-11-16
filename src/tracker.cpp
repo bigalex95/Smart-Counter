@@ -15,20 +15,20 @@ float SimpleTracker::calculate_distance(Point p1, Point p2)
 
 vector<TrackedObject> SimpleTracker::update(const vector<Detection> &detections)
 {
-    // 1. Превращаем детекции в центроиды
+    // 1. Convert detections to centroids
     vector<Point> input_centroids;
     vector<Rect> input_boxes;
     for (const auto &det : detections)
     {
         if (det.class_id != 0)
-            continue; // Тречим только людей
+            continue; // track people only (COCO class 0)
 
         Point center(det.box.x + det.box.width / 2, det.box.y + det.box.height / 2);
         input_centroids.push_back(center);
         input_boxes.push_back(det.box);
     }
 
-    // Если трекер пуст, просто регистрируем всех новых
+    // Tracker is empty: just register every detection as a new object
     if (objects.empty())
     {
         for (size_t i = 0; i < input_centroids.size(); i++)
@@ -36,36 +36,36 @@ vector<TrackedObject> SimpleTracker::update(const vector<Detection> &detections)
             TrackedObject obj;
             obj.id = next_id++;
             obj.center = input_centroids[i];
-            obj.previous_center = input_centroids[i]; // Для новых объектов предыдущая позиция = текущая
+            obj.previous_center = input_centroids[i]; // new objects: previous position = current position
             obj.box = input_boxes[i];
             obj.frames_since_seen = 0;
             objects[obj.id] = obj;
         }
 
-        // Возвращаем текущее состояние
+        // Return the current state
         vector<TrackedObject> result;
         for (auto &pair : objects)
             result.push_back(pair.second);
         return result;
     }
 
-    // 2. Матчинг (Сопоставление) старых и новых
-    // Жадный алгоритм: ищем ближайшего соседа
-    // В map ключи - это ID существующих объектов
+    // 2. Matching of existing tracks and new detections
+    // Greedy nearest-neighbour search
+    // Keys of the map are IDs of existing objects
 
-    // Помечаем все существующие как "потерянные" (+1 кадр)
+    // Mark all existing tracks as "missed" (+1 frame)
     for (auto &pair : objects)
     {
         pair.second.frames_since_seen++;
     }
 
-    // Пытаемся найти пару для каждого нового ввода
+    // Try to find a match for every new detection
     for (size_t i = 0; i < input_centroids.size(); i++)
     {
         Point current_center = input_centroids[i];
 
         int best_id = -1;
-        float min_dist = (float)distance_threshold; // Дистанция отсечения
+        float min_dist = (float)distance_threshold; // distance gate
 
         for (auto &pair : objects)
         {
@@ -79,28 +79,28 @@ vector<TrackedObject> SimpleTracker::update(const vector<Detection> &detections)
 
         if (best_id != -1)
         {
-            // Нашли совпадение! Сначала сохраняем старую позицию
+            // Match found: first keep the old position
             objects[best_id].previous_center = objects[best_id].center;
-            // Потом обновляем новую
+            // then update to the new one
             objects[best_id].center = current_center;
             objects[best_id].box = input_boxes[i];
             objects[best_id].frames_since_seen = 0;
         }
         else
         {
-            // Никого рядом нет -> Новый объект
+            // Nothing nearby -> new object
             TrackedObject new_obj;
             new_obj.id = next_id++;
             new_obj.center = current_center;
-            new_obj.previous_center = current_center; // Для новых объектов предыдущая позиция = текущая
+            new_obj.previous_center = current_center; // new objects: previous position = current position
             new_obj.box = input_boxes[i];
             new_obj.frames_since_seen = 0;
             objects[new_obj.id] = new_obj;
         }
     }
 
-    // 3. Удаление мертвых треков
-    // Удаляем тех, кого не видели слишком долго
+    // 3. Remove dead tracks
+    // Drop tracks that have not been seen for too long
     auto it = objects.begin();
     while (it != objects.end())
     {
@@ -114,11 +114,11 @@ vector<TrackedObject> SimpleTracker::update(const vector<Detection> &detections)
         }
     }
 
-    // Возвращаем результат
+    // Return the result
     vector<TrackedObject> result;
     for (auto &pair : objects)
     {
-        // Возвращаем только тех, кого видели недавно (чтобы не рисовать призраков)
+        // Return only recently seen tracks (avoid drawing ghosts)
         if (pair.second.frames_since_seen < 2)
         {
             result.push_back(pair.second);

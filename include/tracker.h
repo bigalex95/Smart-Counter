@@ -1,16 +1,16 @@
 #pragma once
-#include <opencv2/opencv.hpp>
+#include <opencv2/core.hpp>
 #include <vector>
 #include <map>
-#include "detector.h" // Нам нужна структура Detection
+#include "detection.h"
 
 struct TrackedObject
 {
     int id;
     cv::Point center;
-    cv::Point previous_center; // Предыдущая позиция для определения направления движения
+    cv::Point previous_center; // previous position, used to determine movement direction
     cv::Rect box;
-    int frames_since_seen; // Чтобы не удалять объект сразу, если он моргнул
+    int frames_since_seen; // grace period: do not drop a track the moment a detection flickers
 };
 
 class SimpleTracker
@@ -18,12 +18,12 @@ class SimpleTracker
 public:
     SimpleTracker(int max_frames_missing = 5, int distance_threshold = 50);
 
-    // Принимает сырые детекции, возвращает объекты с ID
+    // Takes raw detections, returns tracked objects with persistent IDs
     std::vector<TrackedObject> update(const std::vector<Detection> &detections);
 
 private:
     int next_id = 0;
-    std::map<int, TrackedObject> objects; // Хранилище активных объектов
+    std::map<int, TrackedObject> objects; // active tracks
 
     int max_frames_missing;
     int distance_threshold;

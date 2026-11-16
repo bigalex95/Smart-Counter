@@ -3,14 +3,7 @@
 #include <onnxruntime_cxx_api.h>
 #include <vector>
 #include <string>
-
-// Структура для хранения результата детекции
-struct Detection
-{
-    int class_id;
-    float confidence;
-    cv::Rect box;
-};
+#include "detection.h"
 
 class YOLODetector
 {
