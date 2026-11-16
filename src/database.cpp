@@ -36,7 +36,7 @@ Database::~Database()
 
 void Database::init()
 {
-    // Создаем таблицу с двумя счетчиками: вход и выход
+    // Create a table with two counters: entries and exits
     const char *sql = "CREATE TABLE IF NOT EXISTS people_count ("
                       "id INTEGER PRIMARY KEY AUTOINCREMENT,"
                       "timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,"
@@ -58,8 +58,8 @@ void Database::init()
 
 void Database::insert_log(int in_count, int out_count)
 {
-    // В реальном коде лучше использовать Prepared Statements, чтобы избежать инъекций,
-    // но для Int это безопасно.
+    // Real code should use prepared statements to avoid injection,
+    // but this is safe for integers.
     std::string sql = "INSERT INTO people_count (in_count, out_count) VALUES (" +
                       std::to_string(in_count) + ", " + std::to_string(out_count) + ");";
 

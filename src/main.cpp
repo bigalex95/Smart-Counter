@@ -100,12 +100,12 @@ int main(int argc, char **argv)
     std::cout << "🔁 Loop mode: " << (loop_video ? "enabled" : "disabled") << std::endl;
     std::cout << "⚡ Using: " << (use_gpu ? "GPU" : "CPU") << std::endl;
 
-    // Инициализация детектора
+    // Initialize the detector
     std::cout << "\n🔄 Initializing Detector..." << std::endl;
     YOLODetector detector(model_path, use_gpu);
-    SimpleTracker tracker; // Создаем трекер
+    SimpleTracker tracker; // Create the tracker
 
-    // Открытие видео
+    // Open the video
     cv::VideoCapture cap(video_path);
     if (!cap.isOpened())
     {
@@ -113,19 +113,19 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    // Узнаем FPS видео, чтобы проигрывать с правильной скоростью
+    // Get the video FPS to play back at the correct speed
     double video_fps = cap.get(cv::CAP_PROP_FPS);
-    int delay_ms = 1000 / video_fps; // Например, 1000/25 = 40 мс
+    int delay_ms = 1000 / video_fps; // For example, 1000/25 = 40 ms
 
-    int line_y = cap.get(cv::CAP_PROP_FRAME_HEIGHT) / 2; // Линия на середине кадра
+    int line_y = cap.get(cv::CAP_PROP_FRAME_HEIGHT) / 2; // Line at the middle of the frame
 
-    // Счетчики входа и выхода
+    // Entry and exit counters
     LineCounter line_counter(line_y);
 
     // FPS counter for tracking performance
     FPSCounter fps_counter;
 
-    // Настройка VideoWriter для headless режима
+    // VideoWriter setup for headless mode
     cv::VideoWriter video_writer;
     if (headless_mode)
     {
@@ -149,7 +149,7 @@ int main(int argc, char **argv)
         }
     }
 
-    int last_saved_count = 0; // Чтобы не спамить в БД
+    int last_saved_count = 0; // To avoid spamming the DB
 
     cv::Mat frame;
     while (true)
@@ -176,44 +176,44 @@ int main(int argc, char **argv)
             }
         }
 
-        // Запуск детекции
-        // Засекаем время для честного FPS
+        // Run detection
+        // Measure time for an accurate FPS
         auto start = std::chrono::high_resolution_clock::now();
 
-        // 1. Детекция
+        // 1. Detection
         auto detections = detector.detect(frame, 0.5);
 
-        // 2. Трекинг (превращаем просто боксы в объекты с ID)
+        // 2. Tracking (turn plain boxes into objects with IDs)
         auto tracked_objects = tracker.update(detections);
 
-        // 3. Логика двунаправленного подсчета
-        cv::Scalar line_color(0, 255, 255); // По умолчанию желтая
+        // 3. Bidirectional counting logic
+        cv::Scalar line_color(0, 255, 255); // Yellow by default
 
         for (const auto &obj : tracked_objects)
         {
-            // Рисуем бокс и ID
+            // Draw the box and ID
             cv::rectangle(frame, obj.box, cv::Scalar(0, 255, 0), 2);
             cv::putText(frame, "ID: " + std::to_string(obj.id),
                         cv::Point(obj.box.x, obj.box.y - 10),
                         cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 2);
 
-            // Рисуем центральную точку
+            // Draw the center point
             cv::circle(frame, obj.center, 5, cv::Scalar(0, 255, 0), -1);
 
-            // Логика векторного пересечения (см. line_counter.cpp)
+            // Vector crossing logic (see line_counter.cpp)
             Crossing crossing = line_counter.update(obj);
             if (crossing == Crossing::In)
-                line_color = cv::Scalar(0, 255, 0); // Зеленый миг
+                line_color = cv::Scalar(0, 255, 0); // Green flash
             else if (crossing == Crossing::Out)
-                line_color = cv::Scalar(0, 0, 255); // Красный миг
+                line_color = cv::Scalar(0, 0, 255); // Red flash
         }
 
-        // ЛОГИКА СОХРАНЕНИЯ
+        // SAVE LOGIC
         int count_in = line_counter.count_in();
         int count_out = line_counter.count_out();
         int current_count = line_counter.total();
 
-        // Пишем в базу, только если счетчик увеличился
+        // Write to the DB only if the counter increased
         if (current_count > last_saved_count)
         {
             db.insert_log(count_in, count_out);
@@ -221,21 +221,21 @@ int main(int argc, char **argv)
             std::cout << "📦 Data saved to DB: IN=" << count_in << " OUT=" << count_out << std::endl;
         }
 
-        // Рисуем линию подсчета (цвет меняется при пересечении)
+        // Draw the counting line (color changes on crossing)
         cv::line(frame, cv::Point(0, line_y), cv::Point(frame.cols, line_y), line_color, 2);
 
-        // Вычисляем занятость (сколько внутри)
+        // Compute occupancy (how many are inside)
         int occupancy = count_in - count_out;
-        int corrected_occupancy = std::max(0, occupancy); // Защита от отрицательных значений
+        int corrected_occupancy = std::max(0, occupancy); // Guard against negative values
 
-        // Рисуем информационную панель
+        // Draw the info panel
         cv::rectangle(frame, cv::Point(0, 0), cv::Point(300, 140), cv::Scalar(0, 0, 0), -1);
         cv::putText(frame, "IN: " + std::to_string(count_in),
                     cv::Point(10, 40), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 0), 2);
         cv::putText(frame, "OUT: " + std::to_string(count_out),
                     cv::Point(10, 80), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 255), 2);
 
-        // Показываем корректированное значение с предупреждением о дрейфе
+        // Show the corrected value with a drift warning
         cv::Scalar occupancy_color = (occupancy < 0) ? cv::Scalar(0, 165, 255) : cv::Scalar(255, 255, 255);
         std::string occupancy_text = "INSIDE: " + std::to_string(corrected_occupancy);
         if (occupancy < 0)
@@ -275,10 +275,10 @@ int main(int argc, char **argv)
                       << ", INSIDE: " << (count_in - count_out) << std::endl;
         }
 
-        // Отображение или запись в зависимости от режима
+        // Display or write depending on mode
         if (headless_mode)
         {
-            // В headless режиме просто пишем в файл
+            // In headless mode, just write to file
             if (video_writer.isOpened())
             {
                 video_writer.write(frame);
@@ -288,14 +288,14 @@ int main(int argc, char **argv)
         }
         else
         {
-            // В обычном режиме показываем окно
+            // In normal mode, show a window
             cv::imshow("C++ YOLOv8 Inference", frame);
             if (cv::waitKey(delay_ms) == 'q')
                 break;
         }
     }
 
-    // Освобождаем VideoWriter
+    // Release the VideoWriter
     if (video_writer.isOpened())
     {
         video_writer.release();

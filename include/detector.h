@@ -8,23 +8,23 @@
 class YOLODetector
 {
 public:
-    // Конструктор: загружает модель и настраивает сессию
+    // Constructor: loads the model and configures the session
     YOLODetector(const std::string &model_path, bool use_cuda = true);
 
-    // Главный метод: принимает картинку, возвращает список найденных объектов
+    // Main method: takes an image, returns a list of detected objects
     std::vector<Detection> detect(cv::Mat &image, float conf_threshold = 0.5);
 
 private:
-    // Внутренние ресурсы ONNX Runtime
+    // Internal ONNX Runtime resources
     Ort::Env env{nullptr};
     Ort::SessionOptions session_options{nullptr};
     Ort::Session session{nullptr};
 
-    // Параметры модели (будем считывать их динамически)
+    // Model parameters (read dynamically)
     std::vector<const char *> input_names;
     std::vector<const char *> output_names;
     std::vector<int64_t> input_shape;
 
-    // Вспомогательный метод для подготовки картинки
+    // Helper method for image preprocessing
     std::vector<float> preprocess(const cv::Mat &image, float &scale);
 };

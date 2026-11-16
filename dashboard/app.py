@@ -42,7 +42,7 @@ DATA_LIMIT = args.limit
 
 st.set_page_config(page_title="Smart Counter Analytics", layout="wide")
 
-# Заголовок с кнопкой сброса
+# Header with reset button
 col_title, col_reset = st.columns([4, 1])
 with col_title:
     st.title("Smart Counter: People Counting Analytics")
@@ -63,20 +63,20 @@ with col_reset:
 
 
 def load_data():
-    """Читает данные из SQLite и возвращает DataFrame"""
+    """Reads data from SQLite and returns a DataFrame"""
     if not os.path.exists(DB_PATH):
         return pd.DataFrame()
 
     try:
         conn = sqlite3.connect(DB_PATH)
-        # Читаем последние N записей (задается параметром --limit)
+        # Read the last N records (set by the --limit parameter)
         query = f"SELECT timestamp, in_count, out_count FROM people_count ORDER BY timestamp DESC LIMIT {DATA_LIMIT}"
         df = pd.read_sql(query, conn)
         conn.close()
 
-        # Конвертируем timestamp в datetime
+        # Convert timestamp to datetime
         df["timestamp"] = pd.to_datetime(df["timestamp"])
-        # Вычисляем occupancy (сколько внутри)
+        # Compute occupancy (how many are inside)
         df["occupancy"] = df["in_count"] - df["out_count"]
         return df.sort_values("timestamp")
     except Exception as e:
@@ -84,21 +84,21 @@ def load_data():
         return pd.DataFrame()
 
 
-# Плейсхолдеры для метрик и графиков
+# Placeholders for metrics and charts
 metric_placeholder = st.empty()
 chart_placeholder = st.empty()
 
-# Автообновление каждые 2 секунды
+# Auto-refresh every 2 seconds
 while True:
     df = load_data()
 
     if not df.empty:
-        # Вычисляем метрики
+        # Compute metrics
         current_in = df.iloc[-1]["in_count"]
         current_out = df.iloc[-1]["out_count"]
         current_occupancy = df.iloc[-1]["occupancy"]
 
-        # Защита от дрейфа: корректируем отрицательные значения occupancy
+        # Drift protection: clamp negative occupancy values
         corrected_occupancy = max(0, current_occupancy)
         has_drift = current_occupancy < 0
 
@@ -107,7 +107,7 @@ while True:
             col1.metric("👇 IN", current_in, delta=None, delta_color="normal")
             col2.metric("👆 OUT", current_out, delta=None, delta_color="inverse")
 
-            # Показываем предупреждение о дрейфе
+            # Show drift warning
             if has_drift:
                 col3.metric(
                     "🏢 INSIDE",
@@ -122,7 +122,7 @@ while True:
 
             col4.metric("⏰ Last Update", df.iloc[-1]["timestamp"].strftime("%H:%M:%S"))
 
-            # Добавляем предупреждение о дрейфе
+            # Add drift warning
             if has_drift:
                 st.warning(
                     f"⚠️ Tracker drift detected: Occupancy went negative ({current_occupancy}). "
@@ -130,21 +130,21 @@ while True:
                     f"Consider resetting counters or improving tracking conditions."
                 )
 
-        # Рисуем графики
+        # Draw charts
         with chart_placeholder.container():
             st.subheader("📊 Crossing flow")
 
-            # Создаем DataFrame для графика с двумя линиями
+            # Create a DataFrame for a two-line chart
             chart_data = df[["timestamp", "in_count", "out_count", "occupancy"]].copy()
             chart_data = chart_data.set_index("timestamp")
 
-            # График входа/выхода
+            # Entries/exits chart
             st.line_chart(
                 chart_data[["in_count", "out_count"]], color=["#00ff00", "#ff0000"]
             )
 
             st.subheader("👥 Occupancy Over Time")
-            # График занятости
+            # Occupancy chart
             st.area_chart(chart_data[["occupancy"]], color=["#0088ff"])
     else:
         st.warning("Waiting for data...")
